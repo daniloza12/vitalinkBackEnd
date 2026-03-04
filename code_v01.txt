@@ -1,0 +1,1034 @@
+
+╭─── Claude Code v2.1.66 ──────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│               Welcome back Danilozky!              │ started                 │
+│                                                    │ √ Run /init to create … │
+│                       ▐▛███▜▌                      │ ─────────────────────── │
+│                      ▝▜█████▛▘                     │ Recent activity         │
+│                        ▘▘ ▝▝                       │ No recent activity      │
+│                                                    │                         │
+│              Sonnet 4.6 · Claude Pro               │                         │
+│ D:\Danilo\Data Danilo\Proyectos\VitaLink\Software… │                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Plan to implement                                                            │
+│                                                                              │
+│ Plan: VitaLink Spring Boot 3 Backend (Java 17)                               │
+│                                                                              │
+│ Context                                                                      │
+│                                                                              │
+│ El frontend Angular 19 (VitaLink) necesita un backend REST en                │
+│ http://localhost:8080/api/v1 para autenticación, gestión de cuentas y        │
+│ perfiles de emergencia médica. El backend debe exponer los endpoints         │
+│ descritos en base_01.txt, persistir datos y soportar CORS con Angular en     │
+│ localhost:4200.                                                              │
+│                                                                              │
+│ ---                                                                          │
+│ Decisiones de Arquitectura                                                   │
+│                                                                              │
+│ ┌────────────────────────┬────────────────────────────────────────────────┐  │
+│ │        Aspecto         │                    Decisión                    │  │
+│ ├────────────────────────┼────────────────────────────────────────────────┤  │
+│ │ Java                   │ 17                                             │  │
+│ ├────────────────────────┼────────────────────────────────────────────────┤  │
+│ │ Framework              │ Spring Boot 3.3.x                              │  │
+│ ├────────────────────────┼────────────────────────────────────────────────┤  │
+│ │ Base de datos          │ H2 con archivo ./data/vitalink (gratis,        │  │
+│ │                        │ zero-config)                                   │  │
+│ ├────────────────────────┼────────────────────────────────────────────────┤  │
+│ │ ORM                    │ Spring Data JPA + Hibernate                    │  │
+│ ├────────────────────────┼────────────────────────────────────────────────┤  │
+│ │ Serialización JSON     │ Jackson AttributeConverter para Profile        │  │
+│ │ anidado                │                                                │  │
+│ ├────────────────────────┼────────────────────────────────────────────────┤  │
+│ │ Contraseñas            │ SHA-256 en backend (MessageDigest)             │  │
+│ ├────────────────────────┼────────────────────────────────────────────────┤  │
+│ │ IDs                    │ UUID generado en backend                       │  │
+│ ├────────────────────────┼────────────────────────────────────────────────┤  │
+│ │ CORS                   │ Permite http://localhost:4200                  │  │
+│ ├────────────────────────┼────────────────────────────────────────────────┤  │
+│ │ Auth                   │ Validación simple en servicio (sin JWT/Spring  │  │
+│ │                        │ Security)                                      │  │
+│ └────────────────────────┴────────────────────────────────────────────────┘  │
+│                                                                              │
+│ ---                                                                          │
+│ Estructura del Proyecto                                                      │
+│                                                                              │
+│ BackEnd/                                                                     │
+│ ├── pom.xml                                                                  │
+│ ├── src/main/                                                                │
+│ │   ├── java/com/vitalink/backend/                                           │
+│ │   │   ├── BackendApplication.java                                          │
+│ │   │   ├── config/                                                          │
+│ │   │   │   └── CorsConfig.java                                              │
+│ │   │   ├── controller/                                                      │
+│ │   │   │   ├── AuthController.java                                          │
+│ │   │   │   ├── AccountController.java                                       │
+│ │   │   │   └── ProfileController.java                                       │
+│ │   │   ├── dto/                                                             │
+│ │   │   │   ├── LoginRequest.java                                            │
+│ │   │   │   ├── RegisterRequest.java                                         │
+│ │   │   │   └── ProfileRequest.java        ← mismo shape que Account y       │
+│ Profile del frontend                                                         │
+│ │   │   ├── entity/                                                          │
+│ │   │   │   ├── Account.java               ← @Entity con id, email,          │
+│ password, role, securityAccount, qrDataUrl, createdAt                        │
+│ │   │   │   ├── Profile.java               ← @Entity con accountId +         │
+│ columnas TEXT (personal, medical, contacts, visibility)                      │
+│ │   │   │   └── converter/                                                   │
+│ │   │   │       ├── PersonalDataConverter.java                               │
+│ │   │   │       ├── MedicalDataConverter.java                                │
+│ │   │   │       ├── ContactListConverter.java                                │
+│ │   │   │       └── VisibilityConverter.java                                 │
+│ │   │   ├── repository/                                                      │
+│ │   │   │   ├── AccountRepository.java                                       │
+│ │   │   │   └── ProfileRepository.java                                       │
+│ │   │   ├── service/                                                         │
+│ │   │   │   ├── AuthService.java           ← interface                       │
+│ │   │   │   ├── AccountService.java        ← interface                       │
+│ │   │   │   └── ProfileService.java        ← interface                       │
+│ │   │   ├── service/impl/                                                    │
+│ │   │   │   ├── AuthServiceImpl.java                                         │
+│ │   │   │   ├── AccountServiceImpl.java                                      │
+│ │   │   │   └── ProfileServiceImpl.java                                      │
+│ │   │   └── exception/                                                       │
+│ │   │       ├── ResourceNotFoundException.java                               │
+│ │   │       └── GlobalExceptionHandler.java                                  │
+│ │   └── resources/                                                           │
+│ │       └── application.properties                                           │
+│                                                                              │
+│ ---                                                                          │
+│ Detalle de Implementación                                                    │
+│                                                                              │
+│ pom.xml — Dependencias                                                       │
+│                                                                              │
+│ - spring-boot-starter-web                                                    │
+│ - spring-boot-starter-data-jpa                                               │
+│ - com.h2database:h2 (runtime)                                                │
+│ - jackson-databind (incluido en web)                                         │
+│ - lombok (opcional, pero lo usamos)                                          │
+│                                                                              │
+│ application.properties                                                       │
+│                                                                              │
+│ server.port=8080                                                             │
+│ spring.datasource.url=jdbc:h2:file:./data/vitalink;DB_CLOSE_ON_EXIT=FALSE    │
+│ spring.datasource.driver-class-name=org.h2.Driver                            │
+│ spring.datasource.username=sa                                                │
+│ spring.datasource.password=                                                  │
+│ spring.jpa.database-platform=org.hibernate.dialect.H2Dialect                 │
+│ spring.jpa.hibernate.ddl-auto=update                                         │
+│ spring.h2.console.enabled=true                                               │
+│ spring.h2.console.path=/h2-console                                           │
+│                                                                              │
+│ ---                                                                          │
+│ Entidades JPA                                                                │
+│                                                                              │
+│ Account.java                                                                 │
+│                                                                              │
+│ @Entity @Table(name="accounts")                                              │
+│ - id: String (UUID, @Id)                                                     │
+│ - email: String (@Column unique, not null)                                   │
+│ - password: String (SHA-256 hash, not null)                                  │
+│ - role: String (ADMIN/USER, default USER)                                    │
+│ - securityAccount: String (@Column unique) — generado en registro            │
+│ - qrDataUrl: String (@Column(columnDefinition="TEXT")) — nullable, enviado   │
+│ por frontend                                                                 │
+│ - createdAt: String (ISO datetime)                                           │
+│                                                                              │
+│ Profile.java                                                                 │
+│                                                                              │
+│ @Entity @Table(name="profiles")                                              │
+│ - id: Long (@Id @GeneratedValue)                                             │
+│ - accountId: String (@Column unique — FK lógica a Account)                   │
+│ - personal: PersonalData (convertida a TEXT via AttributeConverter)          │
+│ - medical: MedicalData (convertida a TEXT via AttributeConverter)            │
+│ - contacts: List<Contact> (convertida a TEXT via AttributeConverter)         │
+│ - visibility: ProfileVisibility (convertida a TEXT via AttributeConverter)   │
+│                                                                              │
+│ POJOs en entity/                                                             │
+│                                                                              │
+│ PersonalData { sex, birthDate, fullName, phone, personalEmail, workEmail,    │
+│ city, district }                                                             │
+│ MedicalData  { diseases, allergies, others }                                 │
+│ Contact      { fullName, phone, personalEmail, workEmail }                   │
+│ PersonalVisibility  { sex, birthDate, fullName, phone, personalEmail,        │
+│ workEmail, city, district }                                                  │
+│ ContactVisibility   { fullName, phone, personalEmail, workEmail }            │
+│ ProfileVisibility   { personal: PersonalVisibility, contacts:                │
+│ List<ContactVisibility> }                                                    │
+│                                                                              │
+│ Converters (AttributeConverter<T, String>)                                   │
+│                                                                              │
+│ Cada converter usa ObjectMapper para serializar/deserializar el POJO a JSON  │
+│ String en BD.                                                                │
+│                                                                              │
+│ ---                                                                          │
+│ Repositorios                                                                 │
+│                                                                              │
+│ AccountRepository extends JpaRepository<Account, String>:                    │
+│   Optional<Account> findByEmail(String email)                                │
+│   Optional<Account> findBySecurityAccount(String securityAccount)            │
+│                                                                              │
+│ ProfileRepository extends JpaRepository<Profile, Long>:                      │
+│   Optional<Profile> findByAccountId(String accountId)                        │
+│                                                                              │
+│ ---                                                                          │
+│ Services (interfaces + impl)                                                 │
+│                                                                              │
+│ AuthService / AuthServiceImpl                                                │
+│                                                                              │
+│ register(email, password) → Account:                                         │
+│   1. Verificar que email no exista                                           │
+│   2. Hashear password con SHA-256                                            │
+│   3. Generar securityAccount = SHA-256(email +                               │
+│ System.currentTimeMillis()).substring(0,32)                                  │
+│   4. Generar UUID para id                                                    │
+│   5. Setear role=USER, createdAt=now()                                       │
+│   6. Guardar y retornar Account                                              │
+│                                                                              │
+│ login(email, password) → Account:                                            │
+│   1. Buscar por email                                                        │
+│   2. Hashear password recibida                                               │
+│   3. Comparar hash almacenado                                                │
+│   4. Si coincide, retornar Account; sino throw 401                           │
+│                                                                              │
+│ AccountService / AccountServiceImpl                                          │
+│                                                                              │
+│ getAll()                              → List<Account>                        │
+│ getById(id)                           → Account (throw 404 si no existe)     │
+│ getBySecurityAccount(secAccount)      → Account (throw 404 si no existe)     │
+│ update(id, data)                      → Account (actualizar campos no nulos) │
+│ delete(id)                            → void                                 │
+│                                                                              │
+│ ProfileService / ProfileServiceImpl                                          │
+│                                                                              │
+│ getByAccountId(accountId)             → Profile (throw 404 si no existe)     │
+│ create(profile)                       → Profile (throw 409 si ya existe)     │
+│ update(accountId, profile)            → Profile (throw 404 si no existe)     │
+│                                                                              │
+│ ---                                                                          │
+│ Controllers                                                                  │
+│                                                                              │
+│ AuthController — POST /api/v1/auth                                           │
+│                                                                              │
+│ @PostMapping("/register")  → 201 Created + Account body                      │
+│ @PostMapping("/login")     → 200 OK + Account body (401 si credenciales      │
+│ inválidas)                                                                   │
+│                                                                              │
+│ AccountController — /api/v1/accounts                                         │
+│                                                                              │
+│ @GetMapping            → 200 + List<Account>                                 │
+│ @GetMapping("/{id}")   → 200 + Account                                       │
+│ @GetMapping("/security/{securityAccount}") → 200 + Account                   │
+│ @PutMapping("/{id}")   → 200 + Account actualizado                           │
+│ @DeleteMapping("/{id}")→ 204 No Content                                      │
+│                                                                              │
+│ ProfileController — /api/v1/profiles                                         │
+│                                                                              │
+│ @GetMapping("/{accountId}")  → 200 + Profile                                 │
+│ @PostMapping                 → 201 + Profile creado                          │
+│ @PutMapping("/{accountId}")  → 200 + Profile actualizado                     │
+│                                                                              │
+│ ---                                                                          │
+│ Manejo de Excepciones                                                        │
+│                                                                              │
+│ ResourceNotFoundException extends RuntimeException                           │
+│ GlobalExceptionHandler (@RestControllerAdvice):                              │
+│   - handleNotFound → 404 { error: "Not Found", message: "..." }              │
+│   - handleConflict → 409 { error: "Conflict", message: "..." }               │
+│   - handleBadCredentials → 401 { error: "Unauthorized" }                     │
+│   - handleGeneral → 500 { error: "Internal Server Error" }                   │
+│                                                                              │
+│ CorsConfig.java                                                              │
+│                                                                              │
+│ Permite:                                                                     │
+│   - origins: http://localhost:4200, http://localhost:3000                    │
+│   - methods: GET, POST, PUT, DELETE, OPTIONS                                 │
+│   - headers: *                                                               │
+│   - allowCredentials: false                                                  │
+│                                                                              │
+│ ---                                                                          │
+│ Archivos a Crear (en orden)                                                  │
+│                                                                              │
+│ 1. pom.xml                                                                   │
+│ 2. src/main/resources/application.properties                                 │
+│ 3. BackendApplication.java                                                   │
+│ 4. Entidades: Account.java, POJOs, Converters, Profile.java                  │
+│ 5. Repositorios: AccountRepository.java, ProfileRepository.java              │
+│ 6. Excepciones: ResourceNotFoundException.java, GlobalExceptionHandler.java  │
+│ 7. Services interfaces: AuthService.java, AccountService.java,               │
+│ ProfileService.java                                                          │
+│ 8. Services impl: AuthServiceImpl.java, AccountServiceImpl.java,             │
+│ ProfileServiceImpl.java                                                      │
+│ 9. DTOs: LoginRequest.java, RegisterRequest.java                             │
+│ 10. Controllers: AuthController.java, AccountController.java,                │
+│ ProfileController.java                                                       │
+│ 11. Config: CorsConfig.java                                                  │
+│                                                                              │
+│ ---                                                                          │
+│ Verificación                                                                 │
+│                                                                              │
+│ 1. mvn spring-boot:run desde BackEnd/                                        │
+│ 2. H2 Console en http://localhost:8080/h2-console (JDBC URL:                 │
+│ jdbc:h2:file:./data/vitalink)                                                │
+│ 3. Prueba con curl o Postman:                                                │
+│   - POST http://localhost:8080/api/v1/auth/register {                        │
+│ "email":"test@vitalink.com", "password":"1234" }                             │
+│   - POST http://localhost:8080/api/v1/auth/login {                           │
+│ "email":"test@vitalink.com", "password":"1234" }                             │
+│   - GET  http://localhost:8080/api/v1/accounts                               │
+│ 4. Levantar Angular (ng serve) → flujo completo de registro y login          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+● Recalled 1 memory, read 1 file (ctrl+o to expand)
+
+● Good. Now I'll create all the project files systematically.
+
+● Write(pom.xml)
+  ⎿  Wrote 66 lines to pom.xml
+       1 <?xml version="1.0" encoding="UTF-8"?>
+       2 <project xmlns="http://maven.apache.org/POM/4.0.0"
+       3          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       4          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 h
+         ttps://maven.apache.org/xsd/maven-4.0.0.xsd">
+       5     <modelVersion>4.0.0</modelVersion>
+       6 
+       7     <parent>
+       8         <groupId>org.springframework.boot</groupId>
+       9         <artifactId>spring-boot-starter-parent</artifactId>
+      10         <version>3.3.5</version>
+     … +56 lines (ctrl+o to expand)
+
+● Write(src\main\resources\application.properties)
+  ⎿  Wrote 19 lines to src\main\resources\application.properties
+       1 server.port=8080
+       2 
+       3 # H2 File Database
+       4 spring.datasource.url=jdbc:h2:file:./data/vitalink;DB_CLOSE_ON_E
+         XIT=FALSE
+       5 spring.datasource.driver-class-name=org.h2.Driver
+       6 spring.datasource.username=sa
+       7 spring.datasource.password=
+       8 
+       9 # JPA
+      10 spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+     … +9 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\BackendApplication.java)
+  ⎿  Wrote 11 lines to
+     src\main\java\com\vitalink\backend\BackendApplication.java
+       1 package com.vitalink.backend;
+       2 
+       3 import org.springframework.boot.SpringApplication;
+       4 import org.springframework.boot.autoconfigure.SpringBootApplicat
+         ion;
+       5 
+       6 @SpringBootApplication
+       7 public class BackendApplication {
+       8     public static void main(String[] args) {
+       9         SpringApplication.run(BackendApplication.class, args);
+      10     }
+     … +1 line (ctrl+o to expand)
+
+● Now create all the entity POJOs and converters in parallel:
+
+● Write(src\main\java\com\vitalink\backend\entity\PersonalData.java)
+  ⎿  Wrote 19 lines to
+     src\main\java\com\vitalink\backend\entity\PersonalData.java
+       1 package com.vitalink.backend.entity;
+       2 
+       3 import lombok.AllArgsConstructor;
+       4 import lombok.Data;
+       5 import lombok.NoArgsConstructor;
+       6 
+       7 @Data
+       8 @NoArgsConstructor
+       9 @AllArgsConstructor
+      10 public class PersonalData {
+     … +9 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\entity\MedicalData.java)
+  ⎿  Wrote 14 lines to
+     src\main\java\com\vitalink\backend\entity\MedicalData.java
+       1 package com.vitalink.backend.entity;
+       2 
+       3 import lombok.AllArgsConstructor;
+       4 import lombok.Data;
+       5 import lombok.NoArgsConstructor;
+       6 
+       7 @Data
+       8 @NoArgsConstructor
+       9 @AllArgsConstructor
+      10 public class MedicalData {
+     … +4 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\entity\Contact.java)
+  ⎿  Wrote 15 lines to
+     src\main\java\com\vitalink\backend\entity\Contact.java
+       1 package com.vitalink.backend.entity;
+       2 
+       3 import lombok.AllArgsConstructor;
+       4 import lombok.Data;
+       5 import lombok.NoArgsConstructor;
+       6 
+       7 @Data
+       8 @NoArgsConstructor
+       9 @AllArgsConstructor
+      10 public class Contact {
+     … +5 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\entity\ProfileVisibility.java)
+  ⎿  Wrote 40 lines to
+     src\main\java\com\vitalink\backend\entity\ProfileVisibility.java
+       1 package com.vitalink.backend.entity;
+       2 
+       3 import lombok.AllArgsConstructor;
+       4 import lombok.Data;
+       5 import lombok.NoArgsConstructor;
+       6 
+       7 import java.util.List;
+       8 
+       9 @Data
+      10 @NoArgsConstructor
+     … +30 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\entity\converter\PersonalDataConverte
+       r.java)
+  ⎿  Wrote 32 lines to src\main\java\com\vitalink\backend\entity\converter\
+     PersonalDataConverter.java
+      1 package com.vitalink.backend.entity.converter;
+      2 
+      3 import com.fasterxml.jackson.databind.ObjectMapper;
+      4 import com.vitalink.backend.entity.PersonalData;
+      5 import jakarta.persistence.AttributeConverter;
+      6 import jakarta.persistence.Converter;
+      7 
+      8 @Converter(autoApply = true)
+      9 public class PersonalDataConverter implements AttributeConverter<
+        PersonalData, String> {
+     … +22 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\entity\converter\MedicalDataConverter
+       .java)
+  ⎿  Wrote 32 lines to src\main\java\com\vitalink\backend\entity\converter\
+     MedicalDataConverter.java
+      1 package com.vitalink.backend.entity.converter;
+      2 
+      3 import com.fasterxml.jackson.databind.ObjectMapper;
+      4 import com.vitalink.backend.entity.MedicalData;
+      5 import jakarta.persistence.AttributeConverter;
+      6 import jakarta.persistence.Converter;
+      7 
+      8 @Converter(autoApply = true)
+      9 public class MedicalDataConverter implements AttributeConverter<M
+        edicalData, String> {
+     … +22 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\entity\converter\ContactListConverter
+       .java)
+  ⎿  Wrote 35 lines to src\main\java\com\vitalink\backend\entity\converter\
+     ContactListConverter.java
+      1 package com.vitalink.backend.entity.converter;
+      2 
+      3 import com.fasterxml.jackson.core.type.TypeReference;
+      4 import com.fasterxml.jackson.databind.ObjectMapper;
+      5 import com.vitalink.backend.entity.Contact;
+      6 import jakarta.persistence.AttributeConverter;
+      7 import jakarta.persistence.Converter;
+      8 
+      9 import java.util.List;
+     … +25 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\entity\converter\VisibilityConverter.
+       java)
+  ⎿  Wrote 32 lines to src\main\java\com\vitalink\backend\entity\converter\
+     VisibilityConverter.java
+      1 package com.vitalink.backend.entity.converter;
+      2 
+      3 import com.fasterxml.jackson.databind.ObjectMapper;
+      4 import com.vitalink.backend.entity.ProfileVisibility;
+      5 import jakarta.persistence.AttributeConverter;
+      6 import jakarta.persistence.Converter;
+      7 
+      8 @Converter(autoApply = true)
+      9 public class VisibilityConverter implements AttributeConverter<Pr
+        ofileVisibility, String> {
+     … +22 lines (ctrl+o to expand)
+
+● Now create the main entities:
+
+● Write(src\main\java\com\vitalink\backend\entity\Account.java)
+  ⎿  Wrote 34 lines to
+     src\main\java\com\vitalink\backend\entity\Account.java
+       1 package com.vitalink.backend.entity;
+       2 
+       3 import jakarta.persistence.*;
+       4 import lombok.AllArgsConstructor;
+       5 import lombok.Data;
+       6 import lombok.NoArgsConstructor;
+       7 
+       8 @Entity
+       9 @Table(name = "accounts")
+      10 @Data
+     … +24 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\entity\Profile.java)
+  ⎿  Wrote 43 lines to
+     src\main\java\com\vitalink\backend\entity\Profile.java
+       1 package com.vitalink.backend.entity;
+       2 
+       3 import com.vitalink.backend.entity.converter.ContactListConverte
+         r;
+       4 import com.vitalink.backend.entity.converter.MedicalDataConverte
+         r;
+       5 import com.vitalink.backend.entity.converter.PersonalDataConvert
+         er;
+       6 import com.vitalink.backend.entity.converter.VisibilityConverter
+         ;
+       7 import jakarta.persistence.*;
+       8 import lombok.AllArgsConstructor;
+       9 import lombok.Data;
+      10 import lombok.NoArgsConstructor;
+     … +33 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\repository\AccountRepository.java)
+  ⎿  Wrote 11 lines to
+     src\main\java\com\vitalink\backend\repository\AccountRepository.java
+       1 package com.vitalink.backend.repository;
+       2 
+       3 import com.vitalink.backend.entity.Account;
+       4 import org.springframework.data.jpa.repository.JpaRepository;
+       5 
+       6 import java.util.Optional;
+       7 
+       8 public interface AccountRepository extends JpaRepository<Account
+         , String> {
+       9     Optional<Account> findByEmail(String email);
+      10     Optional<Account> findBySecurityAccount(String securityAccou
+         nt);
+     … +1 line (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\repository\ProfileRepository.java)
+  ⎿  Wrote 10 lines to
+     src\main\java\com\vitalink\backend\repository\ProfileRepository.java
+       1 package com.vitalink.backend.repository;
+       2 
+       3 import com.vitalink.backend.entity.Profile;
+       4 import org.springframework.data.jpa.repository.JpaRepository;
+       5 
+       6 import java.util.Optional;
+       7 
+       8 public interface ProfileRepository extends JpaRepository<Profile
+         , Long> {
+       9     Optional<Profile> findByAccountId(String accountId);
+      10 }
+
+● Write(src\main\java\com\vitalink\backend\exception\ResourceNotFoundException.j
+       ava)
+  ⎿  Wrote 7 lines to src\main\java\com\vitalink\backend\exception\Resource
+     NotFoundException.java
+      1 package com.vitalink.backend.exception;
+      2 
+      3 public class ResourceNotFoundException extends RuntimeException {
+      4     public ResourceNotFoundException(String message) {
+      5         super(message);
+      6     }
+      7 }
+
+● Write(src\main\java\com\vitalink\backend\exception\ConflictException.java)
+  ⎿  Wrote 7 lines to
+     src\main\java\com\vitalink\backend\exception\ConflictException.java
+      1 package com.vitalink.backend.exception;
+      2 
+      3 public class ConflictException extends RuntimeException {
+      4     public ConflictException(String message) {
+      5         super(message);
+      6     }
+      7 }
+
+● Write(src\main\java\com\vitalink\backend\exception\BadCredentialsException.jav
+       a)
+  ⎿  Wrote 7 lines to src\main\java\com\vitalink\backend\exception\BadCrede
+     ntialsException.java
+      1 package com.vitalink.backend.exception;
+      2 
+      3 public class BadCredentialsException extends RuntimeException {
+      4     public BadCredentialsException(String message) {
+      5         super(message);
+      6     }
+      7 }
+
+● Write(src\main\java\com\vitalink\backend\exception\GlobalExceptionHandler.java
+       )
+  ⎿  Wrote 36 lines to src\main\java\com\vitalink\backend\exception\GlobalE
+     xceptionHandler.java
+       1 package com.vitalink.backend.exception;
+       2 
+       3 import org.springframework.http.HttpStatus;
+       4 import org.springframework.http.ResponseEntity;
+       5 import org.springframework.web.bind.annotation.ExceptionHandler;
+       6 import org.springframework.web.bind.annotation.RestControllerAdv
+         ice;
+       7 
+       8 import java.util.Map;
+       9 
+      10 @RestControllerAdvice
+     … +26 lines (ctrl+o to expand)
+
+● Now create service interfaces and DTOs in parallel:
+
+● Write(src\main\java\com\vitalink\backend\service\AuthService.java)
+  ⎿  Wrote 8 lines to
+     src\main\java\com\vitalink\backend\service\AuthService.java
+      1 package com.vitalink.backend.service;
+      2 
+      3 import com.vitalink.backend.entity.Account;
+      4 
+      5 public interface AuthService {
+      6     Account register(String email, String password);
+      7     Account login(String email, String password);
+      8 }
+
+● Write(src\main\java\com\vitalink\backend\service\AccountService.java)
+  ⎿  Wrote 13 lines to
+     src\main\java\com\vitalink\backend\service\AccountService.java
+       1 package com.vitalink.backend.service;
+       2 
+       3 import com.vitalink.backend.entity.Account;
+       4 
+       5 import java.util.List;
+       6 
+       7 public interface AccountService {
+       8     List<Account> getAll();
+       9     Account getById(String id);
+      10     Account getBySecurityAccount(String securityAccount);
+     … +3 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\service\ProfileService.java)
+  ⎿  Wrote 9 lines to
+     src\main\java\com\vitalink\backend\service\ProfileService.java
+      1 package com.vitalink.backend.service;
+      2 
+      3 import com.vitalink.backend.entity.Profile;
+      4 
+      5 public interface ProfileService {
+      6     Profile getByAccountId(String accountId);
+      7     Profile create(Profile profile);
+      8     Profile update(String accountId, Profile profile);
+      9 }
+
+● Write(src\main\java\com\vitalink\backend\dto\LoginRequest.java)
+  ⎿  Wrote 9 lines to
+     src\main\java\com\vitalink\backend\dto\LoginRequest.java
+      1 package com.vitalink.backend.dto;
+      2 
+      3 import lombok.Data;
+      4 
+      5 @Data
+      6 public class LoginRequest {
+      7     private String email;
+      8     private String password;
+      9 }
+
+● Write(src\main\java\com\vitalink\backend\dto\RegisterRequest.java)
+  ⎿  Wrote 9 lines to
+     src\main\java\com\vitalink\backend\dto\RegisterRequest.java
+      1 package com.vitalink.backend.dto;
+      2 
+      3 import lombok.Data;
+      4 
+      5 @Data
+      6 public class RegisterRequest {
+      7     private String email;
+      8     private String password;
+      9 }
+
+● Now create the service implementations:
+
+● Write(src\main\java\com\vitalink\backend\service\impl\AuthServiceImpl.java)
+  ⎿  Wrote 74 lines to
+     src\main\java\com\vitalink\backend\service\impl\AuthServiceImpl.java
+       1 package com.vitalink.backend.service.impl;
+       2 
+       3 import com.vitalink.backend.entity.Account;
+       4 import com.vitalink.backend.exception.BadCredentialsException;
+       5 import com.vitalink.backend.exception.ConflictException;
+       6 import com.vitalink.backend.repository.AccountRepository;
+       7 import com.vitalink.backend.service.AuthService;
+       8 import org.springframework.stereotype.Service;
+       9 
+      10 import java.nio.charset.StandardCharsets;
+     … +64 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\service\impl\AccountServiceImpl.java)
+  ⎿  Wrote 54 lines to src\main\java\com\vitalink\backend\service\impl\Acco
+     untServiceImpl.java
+      1 package com.vitalink.backend.service.impl;
+      2 
+      3 import com.vitalink.backend.entity.Account;
+      4 import com.vitalink.backend.exception.ResourceNotFoundException;
+      5 import com.vitalink.backend.repository.AccountRepository;
+      6 import com.vitalink.backend.service.AccountService;
+      7 import org.springframework.stereotype.Service;
+      8 
+      9 import java.util.List;
+     … +44 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\service\impl\ProfileServiceImpl.java)
+  ⎿  Wrote 44 lines to src\main\java\com\vitalink\backend\service\impl\Prof
+     ileServiceImpl.java
+       1 package com.vitalink.backend.service.impl;
+       2 
+       3 import com.vitalink.backend.entity.Profile;
+       4 import com.vitalink.backend.exception.ConflictException;
+       5 import com.vitalink.backend.exception.ResourceNotFoundException;
+       6 import com.vitalink.backend.repository.ProfileRepository;
+       7 import com.vitalink.backend.service.ProfileService;
+       8 import org.springframework.stereotype.Service;
+       9 
+      10 @Service
+     … +34 lines (ctrl+o to expand)
+
+● Now create the controllers and CORS config:
+
+● Write(src\main\java\com\vitalink\backend\controller\AuthController.java)
+  ⎿  Wrote 32 lines to
+     src\main\java\com\vitalink\backend\controller\AuthController.java
+      1 package com.vitalink.backend.controller;
+      2 
+      3 import com.vitalink.backend.dto.LoginRequest;
+      4 import com.vitalink.backend.dto.RegisterRequest;
+      5 import com.vitalink.backend.entity.Account;
+      6 import com.vitalink.backend.service.AuthService;
+      7 import org.springframework.http.HttpStatus;
+      8 import org.springframework.http.ResponseEntity;
+      9 import org.springframework.web.bind.annotation.*;
+     … +22 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\controller\AccountController.java)
+  ⎿  Wrote 45 lines to
+     src\main\java\com\vitalink\backend\controller\AccountController.java
+       1 package com.vitalink.backend.controller;
+       2 
+       3 import com.vitalink.backend.entity.Account;
+       4 import com.vitalink.backend.service.AccountService;
+       5 import org.springframework.http.ResponseEntity;
+       6 import org.springframework.web.bind.annotation.*;
+       7 
+       8 import java.util.List;
+       9 
+      10 @RestController
+     … +35 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\controller\ProfileController.java)
+  ⎿  Wrote 33 lines to
+     src\main\java\com\vitalink\backend\controller\ProfileController.java
+       1 package com.vitalink.backend.controller;
+       2 
+       3 import com.vitalink.backend.entity.Profile;
+       4 import com.vitalink.backend.service.ProfileService;
+       5 import org.springframework.http.HttpStatus;
+       6 import org.springframework.http.ResponseEntity;
+       7 import org.springframework.web.bind.annotation.*;
+       8 
+       9 @RestController
+      10 @RequestMapping("/api/v1/profiles")
+     … +23 lines (ctrl+o to expand)
+
+● Write(src\main\java\com\vitalink\backend\config\CorsConfig.java)
+  ⎿  Wrote 18 lines to
+     src\main\java\com\vitalink\backend\config\CorsConfig.java
+       1 package com.vitalink.backend.config;
+       2 
+       3 import org.springframework.context.annotation.Configuration;
+       4 import org.springframework.web.servlet.config.annotation.CorsReg
+         istry;
+       5 import org.springframework.web.servlet.config.annotation.WebMvcC
+         onfigurer;
+       6 
+       7 @Configuration
+       8 public class CorsConfig implements WebMvcConfigurer {
+       9 
+      10     @Override
+     … +8 lines (ctrl+o to expand)
+
+● Now let's verify the complete structure and try to build:
+
+● Searched for 1 pattern (ctrl+o to expand)
+
+● All 29 files are in place. Let's do a compile check:
+
+● Bash(cd "D:/Danilo/Data Danilo/Proyectos/VitaLink/Software/BackEnd" && mvn
+      compile -q 2>&1)
+  ⎿  Error: Exit code 127
+     /usr/bin/bash: line 1: mvn: command not found
+
+     /usr/bin/bash: line 1: mvn: command not found
+
+● Bash(where mvn 2>/dev/null || echo "mvn not in PATH" && ls /c/Program\
+      Files/Java/ 2>/dev/null || echo "no java dir" && ls /c/Users/de_a_/.m2/
+      2>/dev/null | head -5)
+  ⎿  mvn not in PATH
+     jdk-17
+     jdk-21
+     … +3 lines (ctrl+o to expand)
+
+● Searched for 1 pattern (ctrl+o to expand)
+
+● Bash(MVN="/c/Users/de_a_/.m2/wrapper/dists/apache-maven-3.9.10-bin/53h08a94dg6
+      djh6umvruv7q564/apache-maven-3.9.10/bin/mvn" && JAVA_HOME="/c/Program
+      Files/Java/jdk-17…)
+  ⎿  (No output)
+  ⎿  (timeout 3m)
+
+● Clean compile. Let's also run a package to make sure everything links:
+
+● Bash(MVN="/c/Users/de_a_/.m2/wrapper/dists/apache-maven-3.9.10-bin/53h08a94dg6
+      djh6umvruv7q564/apache-maven-3.9.10/bin/mvn" && JAVA_HOME="/c/Program
+      Files/Java/jdk-17…)
+  ⎿  (No output)
+  ⎿  (timeout 3m)
+
+● Build succeeds. Let's save memory for this project:
+
+● Wrote 1 memory (ctrl+o to expand)
+
+● The backend is fully implemented and builds successfully. Here's a summary of
+  what was created:
+
+  Done — 29 files created, compiles and packages cleanly
+
+  Structure:
+  BackEnd/
+  ├── pom.xml                          (Spring Boot 3.3.5, H2, JPA, Lombok)
+  ├── src/main/resources/
+  │   └── application.properties       (H2 file DB, port 8080, h2-console)
+  └── src/main/java/com/vitalink/backend/
+      ├── BackendApplication.java
+      ├── config/CorsConfig.java        (localhost:4200 + 3000)
+      ├── controller/                   (Auth, Account, Profile)
+      ├── dto/                          (LoginRequest, RegisterRequest)
+      ├── entity/                       (Account, Profile, POJOs, Converters)
+      ├── repository/                   (AccountRepository, ProfileRepository)
+      ├── service/                      (interfaces + impl)
+      └── exception/                    (GlobalExceptionHandler + exceptions)
+
+  To run:
+  # From BackEnd/ directory
+  mvn spring-boot:run
+
+  Quick test:
+  curl -X POST http://localhost:8080/api/v1/auth/register \
+    -H "Content-Type: application/json" \
+    -d '{"email":"test@vitalink.com","password":"1234"}'
+
+  H2 Console at http://localhost:8080/h2-console (JDBC URL:
+  jdbc:h2:file:./data/vitalink).
+
+✻ Sautéed for 4m 50s
+
+> como hacer consultar a la base de datos h2 ? 
+
+● Tienes dos opciones:
+
+  1. H2 Console (web UI)
+
+  Con el servidor corriendo, abre en el navegador:
+  http://localhost:8080/h2-console
+
+  Configura la conexión así:
+  - JDBC URL: jdbc:h2:file:./data/vitalink
+  - User Name: sa
+  - Password: (vacío)
+
+  Luego puedes ejecutar SQL directamente:
+  SELECT * FROM ACCOUNTS;
+  SELECT * FROM PROFILES;
+
+  ---
+  2. Con el servidor apagado (archivo directo)
+
+  Puedes conectarte al archivo H2 desde cualquier cliente JDBC (DBeaver,
+  IntelliJ, etc.) con la misma URL:
+  jdbc:h2:file:D:/Danilo/Data
+  Danilo/Proyectos/VitaLink/Software/BackEnd/data/vitalink
+  Requiere que el servidor NO esté corriendo (H2 en modo file no permite dos 
+  conexiones simultáneas por defecto).
+
+  ---
+  3. Desde IntelliJ IDEA
+
+  Si usas IntelliJ Ultimate, en el panel Database → + → H2 → pegar la URL del
+  archivo.
+
+  ---
+  Recomendación: usa la H2 Console (#1) mientras desarrollas — es la más cómoda
+  y no requiere nada extra.
+
+> donde veo el link? uso inteliji 
+
+● Cuando corres el proyecto desde IntelliJ, el link aparece en la consola de
+  Run:
+
+  Started BackendApplication in 2.3 seconds
+
+  Pero el link a H2 Console no aparece automáticamente — simplemente abre el
+  navegador manualmente en:
+
+  http://localhost:8080/h2-console
+
+  ---
+  Pasos en IntelliJ
+
+  1. Abre BackendApplication.java
+  2. Click en el ▶ verde junto a main
+  3. Espera que aparezca en la consola:
+  Tomcat started on port 8080
+  4. Abre el navegador → http://localhost:8080/h2-console
+  5. En el formulario:
+    - JDBC URL: jdbc:h2:file:./data/vitalink
+    - User Name: sa
+    - Password: (dejar vacío)
+  6. Click Connect
+
+  ---
+  Si prefieres usar el Database panel de IntelliJ (Ultimate):
+
+  - Panel derecho → Database → + → Data Source → H2
+  - URL: jdbc:h2:file:D:/Danilo/Data 
+  Danilo/Proyectos/VitaLink/Software/BackEnd/data/vitalink
+  - User: sa
+  - Password: vacío
+
+  ⚠️ Para esto el servidor debe estar apagado, ya que H2 file no permite dos 
+  conexiones al mismo tiempo.
+
+
+> desarrollame un diagrama entidad relacion 
+
+● erDiagram
+      ACCOUNTS {
+          VARCHAR id PK "UUID"
+          VARCHAR email UK "NOT NULL"
+          VARCHAR password "SHA-256"
+          VARCHAR role "USER / ADMIN"
+          VARCHAR securityAccount UK
+          TEXT qrDataUrl "nullable"
+          VARCHAR createdAt "ISO datetime"
+      }
+
+      PROFILES {
+          BIGINT id PK "AUTO_INCREMENT"
+          VARCHAR accountId UK "FK lógica"
+          TEXT personal "JSON"
+          TEXT medical "JSON"
+          TEXT contacts "JSON Array"
+          TEXT visibility "JSON"
+      }
+
+      ACCOUNTS ||--o| PROFILES : "tiene"
+
+  ---
+  Detalle de los campos JSON (almacenados como TEXT)
+
+  erDiagram
+      PROFILES ||--|| PersonalData : "personal"
+      PROFILES ||--|| MedicalData : "medical"
+      PROFILES ||--o{ Contact : "contacts[]"
+      PROFILES ||--|| ProfileVisibility : "visibility"
+      ProfileVisibility ||--|| PersonalVisibility : "personal"
+      ProfileVisibility ||--o{ ContactVisibility : "contacts[]"
+
+      PersonalData {
+          string sex
+          string birthDate
+          string fullName
+          string phone
+          string personalEmail
+          string workEmail
+          string city
+          string district
+      }
+
+      MedicalData {
+          string diseases
+          string allergies
+          string others
+      }
+
+      Contact {
+          string fullName
+          string phone
+          string personalEmail
+          string workEmail
+      }
+
+      PersonalVisibility {
+          boolean sex
+          boolean birthDate
+          boolean fullName
+          boolean phone
+          boolean personalEmail
+          boolean workEmail
+          boolean city
+          boolean district
+      }
+
+      ContactVisibility {
+          boolean fullName
+          boolean phone
+          boolean personalEmail
+          boolean workEmail
+      }
+
+  ---
+  Notas clave
+
+  ┌────────────────┬────────────────────────────────────────────────────────┐
+  │    Aspecto     │                        Detalle                         │
+  ├────────────────┼────────────────────────────────────────────────────────┤
+  │ Relación       │ ACCOUNTS → PROFILES es 1:1 (un account tiene un        │
+  │                │ perfil)                                                │
+  ├────────────────┼────────────────────────────────────────────────────────┤
+  │ FK             │ accountId es FK lógica (no constraint en BD, solo      │
+  │                │ @Column unique)                                        │
+  ├────────────────┼────────────────────────────────────────────────────────┤
+  │ JSON en BD     │ Los 4 campos de PROFILES son columnas TEXT con JSON    │
+  │                │ serializado vía AttributeConverter                     │
+  ├────────────────┼────────────────────────────────────────────────────────┤
+  │ Solo 2 tablas  │ ACCOUNTS y PROFILES — el resto son POJOs en memoria    │
+  │ físicas        │                                                        │
+  └────────────────┴────────────────────────────────────────────────────────┘
+
+> /init 
+
+● Searched for 1 pattern, read 5 files (ctrl+o to expand)
+
+● Write(CLAUDE.md)
+  ⎿  Wrote 94 lines to CLAUDE.md
+       1 # CLAUDE.md
+       2 
+       3 This file provides guidance to Claude Code (claude.ai/code) when
+          working with code in this repository.
+       4 
+       5 ## Build & Run
+       6 
+       7 Maven is not on PATH. Use the cached wrapper binary:
+       8 
+       9 ```bash
+      10 MVN="/c/Users/de_a_/.m2/wrapper/dists/apache-maven-3.9.10-bin/53
+         h08a94dg6djh6umvruv7q564/apache-maven-3.9.10/bin/mvn"
+     … +84 lines (ctrl+o to expand)
+
+● CLAUDE.md creado. Cubre:
+
+  - Comandos exactos de build/run con las rutas reales de Maven y JDK 17 (que no
+   están en PATH)
+  - Decisiones de arquitectura no obvias: por qué no hay JWT, cómo funciona el
+  upsert de Profile, por qué getByAccountId retorna null en vez de 404, y el
+  patrón de JSON en columnas TEXT
+  - Tabla de endpoints y mapeo de excepciones a HTTP
+  - Acceso a H2 con los datos exactos de conexión
+
+✻ Cooked for 48s

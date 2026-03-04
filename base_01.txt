@@ -1,0 +1,31 @@
+┌─────────────────────────────────────────────┬───────────────────────────────────────────────────┐                                             
+  │                   Archivo                   │                    Descripcion                    │                                             
+  ├─────────────────────────────────────────────┼───────────────────────────────────────────────────┤                                             
+  │ src/environments/environment.ts             │ apiUrl: http://localhost:8080/api/v1 (produccion) │                                             
+  ├─────────────────────────────────────────────┼───────────────────────────────────────────────────┤
+  │ src/environments/environment.development.ts │ Misma URL para desarrollo                         │
+  └─────────────────────────────────────────────┴───────────────────────────────────────────────────┘
+
+  Archivos modificados
+
+  app.config.ts — se agrego provideHttpClient(withFetch())
+
+  auth.service.ts — login y register ahora llaman al backend:
+  POST /api/v1/auth/login    { email, password } → Account
+  POST /api/v1/auth/register { email, password } → Account
+  El QR sigue generandose en el frontend. La sesion persiste en localStorage.
+
+  account.service.ts — CRUD completo via HTTP (retorna Observable<T>):
+  GET    /api/v1/accounts
+  GET    /api/v1/accounts/{id}
+  GET    /api/v1/accounts/security/{securityAccount}
+  PUT    /api/v1/accounts/{id}
+  DELETE /api/v1/accounts/{id}
+
+  profile.service.ts — Perfiles via HTTP (retorna Observable<T>):
+  GET /api/v1/profiles/{accountId}
+  PUT /api/v1/profiles/{accountId}
+  POST /api/v1/profiles @
+  
+  
+  
