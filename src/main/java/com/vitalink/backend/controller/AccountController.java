@@ -2,6 +2,8 @@ package com.vitalink.backend.controller;
 
 import com.vitalink.backend.entity.Account;
 import com.vitalink.backend.service.AccountService;
+import com.vitalink.backend.service.RateLimitService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,9 +14,11 @@ import java.util.List;
 public class AccountController {
 
     private final AccountService accountService;
+    private final RateLimitService rateLimitService;
 
-    public AccountController(AccountService accountService) {
+    public AccountController(AccountService accountService, RateLimitService rateLimitService) {
         this.accountService = accountService;
+        this.rateLimitService = rateLimitService;
     }
 
     @GetMapping
@@ -28,7 +32,11 @@ public class AccountController {
     }
 
     @GetMapping("/security/{securityAccount}")
-    public ResponseEntity<Account> getBySecurityAccount(@PathVariable String securityAccount) {
+    public ResponseEntity<Account> getBySecurityAccount(@PathVariable String securityAccount,
+                                                        HttpServletRequest request) {
+        if (rateLimitService.isBlocked(request, "/api/v1/accounts/security")) {
+            return ResponseEntity.status(429).build();
+        }
         return ResponseEntity.ok(accountService.getBySecurityAccount(securityAccount));
     }
 
