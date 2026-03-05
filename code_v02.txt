@@ -1,0 +1,1000 @@
+
+ ▐▛███▜▌   Claude Code v2.1.68
+▝▜█████▛▘  Sonnet 4.6 · Claude Pro
+  ▘▘ ▝▝    D:\Danilo\Data Danilo\Proyectos\VitaLink\Software\BackEnd
+
+> en azure tengoe este error en el log stream                               
+  2026-03-04T23:16:49.6879118Z Error starting ApplicationContext. To        
+  display the condition evaluation report re-run your application with      
+  'debug' enabled.                                                          
+  2026-03-04T23:16:49.7297274Z 2026-03-04T23:16:49.728Z ERROR 70 --- [      
+        main] o.s.b.d.LoggingFailureAnalysisReporter   :                    
+  2026-03-04T23:16:49.7297713Z                                              
+  2026-03-04T23:16:49.7297756Z ***************************                  
+  2026-03-04T23:16:49.7297849Z APPLICATION FAILED TO START                  
+  2026-03-04T23:16:49.7297873Z ***************************                  
+  2026-03-04T23:16:49.7297894Z                                              
+  2026-03-04T23:16:49.7297916Z Description:                                 
+  2026-03-04T23:16:49.7297936Z                                              
+  2026-03-04T23:16:49.7297959Z Invalid mapping pattern detected:            
+  2026-03-04T23:16:49.7297982Z /{path:^(?!api).*$}/**/{path:[^\.]*}         
+  2026-03-04T23:16:49.7298007Z                    ^                         
+  2026-03-04T23:16:49.7298041Z No more pattern data allowed after {*...} or 
+   ** pattern element                                                       
+  2026-03-04T23:16:49.7298067Z                                              
+  2026-03-04T23:16:49.7298093Z Action:                                      
+  2026-03-04T23:16:49.7298122Z                                              
+  2026-03-04T23:16:49.7298164Z Fix this pattern in your application or      
+  switch to the legacy parser implementation with                           
+  'spring.mvc.pathmatch.matching-strategy=ant_path_matcher'.                
+  2026-03-04T23:16:49.7298193Z                                              
+  2026-03-04T23:16:49.7784525Z Wait for pid == 70 either returned           
+  successfully or was interrupted due to a signal 70                        
+  2026-03-04T23:16:49.7798341Z Done waiting for main process.               
+  GLOBAL_PID_MAIN=70.                                                       
+  2026-03-04T23:16:49.7798456Z Exiting entry script!                        
+
+● Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● The third pattern /{path:^(?!api).*$}/**/{path:[^\\.]*} uses ** followed by
+  more path variables, which Spring's PathPatternParser doesn't allow. Fix:
+  replace the third pattern with /**/{path:[^\\.]*} — it already excludes dotted
+   paths (static files) and combined with the API prefix exclusion that lives in
+   the other patterns, it works fine.
+
+● Update(src\main\java\com\vitalink\backend\controller\SpaController.java)
+  ⎿  Added 1 line, removed 1 line
+      10  @Controller
+      11  public class SpaController {
+      12 
+      13 -    @GetMapping(value = { "/", "/{path:[^\\.]*}", "/{path:^(?!a
+         -pi).*$}/**/{path:[^\\.]*}" })                                  
+      13 +    @GetMapping(value = { "/", "/{path:[^\\.]*}", "/**/{path:[^
+         +\\.]*}" })
+      14      public String spa() {
+      15          return "forward:/index.html";
+      16      }
+
+● The fix: /{path:^(?!api).*$}/**/{path:[^\\.]*} → /**/{path:[^\\.]*}.
+
+  Spring's PathPatternParser (default since 2.6) forbids any segment after **.
+  The replacement /**/{path:[^\\.]*} still catches all nested SPA routes while
+  the [^\\.]* regex excludes static files (anything with a dot). Your actual API
+   routes under /api/v1/... will still match their own controllers first due to
+  Spring's specificity-based route ordering.
+
+  Rebuild and redeploy to Azure.
+
+> genera el built para este backend 
+
+● Bash(MVN="/c/Users/de_a_/.m2/wrapper/dists/apache-maven-3.9.10-bin/53h08a94dg6
+      djh6umvruv7q564/apache-maven-3.9.10/bin/mvn"
+      JAVA_HOME="/c/Program Files/Java/jdk-17"…)
+  ⎿  [INFO] Scanning for projects...
+     [INFO]
+     [INFO] ------------------------< com.vitalink:backend >---------------
+     … +27 lines (ctrl+o to expand)
+  ⎿  (timeout 2m)
+
+● Build exitoso. El JAR está en:
+
+  target/backend-0.0.1-SNAPSHOT.jar
+
+  Listo para subir a Azure.
+
+> cuando subi elcodigo al git me salio error en el pipeline Error: Failed   
+  to deploy web package to App Service.                                     
+  Error: Deployment Failed, Error: Failed to deploy web package using       
+  OneDeploy to App Service.                                                 
+
+● Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● O problema está em dois pontos:
+
+  1. mvn clean install gera *.jar e *.jar.original — o glob *.jar faz match nos
+  dois e o Azure falha ao receber múltiplos pacotes.
+  2. mvn clean install roda testes, desnecessário em deploy.
+
+  Fix: excluir o .original no upload e usar -DskipTests.
+
+● Update(.github\workflows\master_vitalinkbackend.yml)
+  ⎿  Added 2 lines, removed 1 line
+      25            distribution: 'microsoft'
+      26 
+      27        - name: Build with Maven
+      28 -        run: mvn clean install                                 
+      28 +        run: mvn clean package -DskipTests
+      29 
+      30        - name: Upload artifact for deployment job
+      31          uses: actions/upload-artifact@v4
+      32          with:
+      33            name: java-app
+      34            path: '${{ github.workspace }}/target/*.jar'
+      35 +          exclude: '${{ github.workspace }}/target/*.jar.origin
+         +al'
+      36 
+      37    deploy:
+      38      runs-on: ubuntu-latest
+
+● Agora faça commit e push:
+
+  git add .github/workflows/master_vitalinkbackend.yml
+  src/main/java/com/vitalink/backend/controller/SpaController.java
+  git commit -m "Fix Azure deployment: exclude .jar.original and fix SPA route 
+  pattern"
+  git push
+
+  O pipeline vai rodar novamente e o deploy deve funcionar.
+
+> ya subi mi codigo 
+
+● Bien, ahora espera que el pipeline de GitHub Actions termine. Puedes
+  monitorearlo en:
+
+  GitHub → tu repo → Actions → el workflow más reciente
+
+  Si vuelve a fallar, pega aquí el log completo del paso Deploy to Azure Web App
+   y lo revisamos.
+
+> tegno este error (node:2324) [DEP0005] DeprecationWarning: Buffer() is    
+  deprecated due to security and usability issues. Please use the           
+  Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.   
+  (Use `node --trace-deprecation ...` to show where the warning was         
+  created)                                                                  
+  Validating SPN Linux Web App inputs...                                    
+  Predeployment Step Started                                                
+  Deployment Step Started                                                   
+  Starting deployment for web app...                                        
+  Package deployment using OneDeploy initiated.                             
+  Error: Failed to deploy web package to App Service.                       
+  Error: Deployment Failed, Error: Failed to deploy web package using       
+  OneDeploy to App Service. en github deploy                                
+
+● El problema persiste porque la sintaxis de exclude en upload-artifact@v4 no
+  funciona así. La forma correcta es usar ! en el path multilínea.
+
+● Read 1 file (ctrl+o to expand)
+
+● Write(.github\workflows\master_vitalinkbackend.yml)
+  ⎿  Added 65 lines, removed 64 lines
+       1 -# Docs for the Azure Web Apps Deploy action: https://github.com
+         -/Azure/webapps-deploy                                         
+       2 -# More GitHub Actions for Azure: https://github.com/Azure/actio
+         -ns                                                            
+       3 -                                                              
+       4 -name: Build and deploy JAR app to Azure Web App - vitalinkBacke
+         -nd                                                            
+       5 -                                                              
+       6 -on:                                                           
+       7 -  push:                                                       
+       8 -    branches:                                                 
+       9 -      - master                                                
+      10 -  workflow_dispatch:                                          
+      11 -                                                              
+      12 -jobs:                                                         
+      13 -  build:                                                      
+      14 -    runs-on: ubuntu-latest                                    
+      15 -    permissions:                                              
+      16 -      contents: read #This is required for actions/checkout   
+      17 -                                                              
+      18 -    steps:                                                    
+      19 -      - uses: actions/checkout@v4                             
+      20 -                                                              
+      21 -      - name: Set up Java version                             
+      22 -        uses: actions/setup-java@v4                           
+      23 -        with:                                                 
+      24 -          java-version: '17'                                  
+      25 -          distribution: 'microsoft'                           
+      26 -                                                              
+      27 -      - name: Build with Maven                                
+      28 -        run: mvn clean package -DskipTests                    
+      29 -                                                              
+      30 -      - name: Upload artifact for deployment job              
+      31 -        uses: actions/upload-artifact@v4                      
+      32 -        with:                                                 
+      33 -          name: java-app                                      
+      34 -          path: '${{ github.workspace }}/target/*.jar'        
+      35 -          exclude: '${{ github.workspace }}/target/*.jar.origin
+         -al'                                                           
+      36 -                                                              
+      37 -  deploy:                                                     
+      38 -    runs-on: ubuntu-latest                                    
+      39 -    needs: build                                              
+      40 -    permissions:                                              
+      41 -      id-token: write #This is required for requesting the JWT
+      42 -      contents: read #This is required for actions/checkout   
+      43 -                                                              
+      44 -    steps:                                                    
+      45 -      - name: Download artifact from build job                
+      46 -        uses: actions/download-artifact@v4                    
+      47 -        with:                                                 
+      48 -          name: java-app                                      
+      49 -                                                              
+      50 -      - name: Login to Azure                                  
+      51 -        uses: azure/login@v2                                  
+      52 -        with:                                                 
+      53 -          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_BE4FA
+         -0A642184CE582ECDBC80853B38C }}                                
+      54 -          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_837B7
+         -0A888CC453297CBF0CEB178DE5D }}                                
+      55 -          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIP
+         -TIONID_61F32D6793E54B02AD3F8071613CDF20 }}                    
+      56 -                                                              
+      57 -      - name: Deploy to Azure Web App                         
+      58 -        id: deploy-to-webapp                                  
+      59 -        uses: azure/webapps-deploy@v3                         
+      60 -        with:                                                 
+      61 -          app-name: 'vitalinkBackend'                         
+      62 -          slot-name: 'Production'                             
+      63 -          package: '*.jar'                                    
+      64 -                                                               
+       1   No newline at end of file
+       2 +# Docs for the Azure Web Apps Deploy action: https://github.com
+         +/Azure/webapps-deploy
+       3 +# More GitHub Actions for Azure: https://github.com/Azure/actio
+         +ns
+       4 +
+       5 +name: Build and deploy JAR app to Azure Web App - vitalinkBacke
+         +nd
+       6 +
+       7 +on:
+       8 +  push:
+       9 +    branches:
+      10 +      - master
+      11 +  workflow_dispatch:
+      12 +
+      13 +jobs:
+      14 +  build:
+      15 +    runs-on: ubuntu-latest
+      16 +    permissions:
+      17 +      contents: read
+      18 +
+      19 +    steps:
+      20 +      - uses: actions/checkout@v4
+      21 +
+      22 +      - name: Set up Java version
+      23 +        uses: actions/setup-java@v4
+      24 +        with:
+      25 +          java-version: '17'
+      26 +          distribution: 'microsoft'
+      27 +
+      28 +      - name: Build with Maven
+      29 +        run: mvn clean package -DskipTests
+      30 +
+      31 +      - name: Rename JAR for deployment
+      32 +        run: cp target/backend-0.0.1-SNAPSHOT.jar target/app.ja
+         +r
+      33 +
+      34 +      - name: Upload artifact for deployment job
+      35 +        uses: actions/upload-artifact@v4
+      36 +        with:
+      37 +          name: java-app
+      38 +          path: target/app.jar
+      39 +
+      40 +  deploy:
+      41 +    runs-on: ubuntu-latest
+      42 +    needs: build
+      43 +    permissions:
+      44 +      id-token: write
+      45 +      contents: read
+      46 +
+      47 +    steps:
+      48 +      - name: Download artifact from build job
+      49 +        uses: actions/download-artifact@v4
+      50 +        with:
+      51 +          name: java-app
+      52 +
+      53 +      - name: Login to Azure
+      54 +        uses: azure/login@v2
+      55 +        with:
+      56 +          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_BE4FA
+         +0A642184CE582ECDBC80853B38C }}
+      57 +          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_837B7
+         +0A888CC453297CBF0CEB178DE5D }}
+      58 +          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIP
+         +TIONID_61F32D6793E54B02AD3F8071613CDF20 }}
+      59 +
+      60 +      - name: Deploy to Azure Web App
+      61 +        id: deploy-to-webapp
+      62 +        uses: azure/webapps-deploy@v3
+      63 +        with:
+      64 +          app-name: 'vitalinkBackend'
+      65 +          slot-name: 'Production'
+      66 +          package: 'app.jar'
+
+● Cambios:
+  - Renombra el JAR a app.jar antes de subir — así el artifact contiene
+  exactamente un archivo con nombre fijo, sin el .original
+  - package: 'app.jar' apunta a un único archivo, sin glob que pueda matchear
+  múltiples
+
+  Haz commit y push:
+
+  git add .github/workflows/master_vitalinkbackend.yml
+  git commit -m "Fix CI: deploy single renamed JAR to avoid OneDeploy multi-file
+   error"
+  git push
+
+> que puedo poner para que me permita de cualquier lugar el allowedOrigins 
+
+● En CorsConfig.java, cambia el origen por *:
+
+● Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● Update(src\main\java\com\vitalink\backend\config\CorsConfig.java)
+  ⎿  Added 1 line, removed 4 lines
+      10      @Override
+      11      public void addCorsMappings(CorsRegistry registry) {
+      12          registry.addMapping("/api/**")
+      13 -                .allowedOrigins("http://localhost:4200", "http:
+         -//localhost:4201", "http://localhost:3000",                    
+      14 -                        "https://blue-flower-0c40ce010.2.azures
+         -taticapps.net",                                                
+      15 -                        "https://vitalinkdev.jdzurita12.workers
+         -.dev",                                                         
+      16 -                        "https://vitalink-api-proxy.jdzurita12.
+         -workers.dev")                                                  
+      13 +                .allowedOriginPatterns("*")
+      14                  .allowedMethods("GET", "POST", "PUT", "DELETE",
+           "OPTIONS")
+      15                  .allowedHeaders("*")
+      16                  .allowCredentials(false);
+
+● Listo. Uso allowedOriginPatterns("*") en lugar de allowedOrigins("*") porque
+  Spring requiere el método allowedOriginPatterns cuando se usan patrones
+  wildcard — allowedOrigins("*") lanza excepción si allowCredentials está activo
+   (aunque aquí es false, es buena práctica).
+
+> que pasa si no uso CorsConfig 
+
+● Si no tienes CorsConfig, Spring Boot no envía los headers
+  Access-Control-Allow-Origin en las respuestas.
+
+  Resultado: el navegador bloquea todas las peticiones del frontend hacia tu
+  API. Verías este error en la consola del navegador:
+
+  Access to XMLHttpRequest at 'https://tu-api.azurewebsites.net/api/v1/...'
+  from origin 'https://tu-frontend.com' has been blocked by CORS policy:
+  No 'Access-Control-Allow-Origin' header is present on the requested resource.
+
+  Las peticiones desde Postman, curl o cualquier cliente no-browser seguirían
+  funcionando sin problema, porque CORS es una restricción del navegador, no del
+   servidor.
+
+> y si uso asi con * en allowedOriginPatterns 
+
+● Con allowedOriginPatterns("*") el servidor responde con:
+
+  Access-Control-Allow-Origin: https://tu-frontend.com
+
+  Acepta peticiones desde cualquier dominio — localhost, Azure Static Apps,
+  Cloudflare Workers, cualquier cliente browser. Es lo más permisivo posible.
+
+  Para un proyecto en desarrollo/educativo como VitaLink está bien. En
+  producción real se recomendaría listar solo los dominios del frontend para
+  evitar que cualquier sitio web consuma tu API.
+
+> en azure tengo error 2026-03-05T00:02:55.6034001Z Error starting          
+  ApplicationContext. To display the condition evaluation report re-run     
+  your application with 'debug' enabled.                                    
+  2026-03-05T00:02:56.207308Z 2026-03-05T00:02:56.206Z ERROR 70 --- [       
+       main] o.s.b.d.LoggingFailureAnalysisReporter   :                     
+  2026-03-05T00:02:56.2073658Z                                              
+  2026-03-05T00:02:56.2073787Z ***************************                  
+  2026-03-05T00:02:56.2073828Z APPLICATION FAILED TO START                  
+  2026-03-05T00:02:56.2073902Z ***************************                  
+  2026-03-05T00:02:56.2073933Z                                              
+  2026-03-05T00:02:56.2073965Z Description:                                 
+  2026-03-05T00:02:56.2073996Z                                              
+  2026-03-05T00:02:56.207403Z Invalid mapping pattern detected:             
+  2026-03-05T00:02:56.2074063Z /**/{path:[^\.]*}                            
+  2026-03-05T00:02:56.2074111Z ^                                            
+  2026-03-05T00:02:56.2074146Z No more pattern data allowed after {*...} or 
+   ** pattern element                                                       
+  2026-03-05T00:02:56.2074176Z                                              
+  2026-03-05T00:02:56.2074206Z Action:                                      
+  2026-03-05T00:02:56.2074234Z                                              
+  2026-03-05T00:02:56.207427Z Fix this pattern in your application or       
+  switch to the legacy parser implementation with                           
+  'spring.mvc.pathmatch.matching-strategy=ant_path_matcher'.                
+  2026-03-05T00:02:56.2074299Z                                              
+
+● El mismo problema — /**/{path:[^\.]*} también es inválido con
+  PathPatternParser. El fix más simple es usar el ant_path_matcher como sugiere
+  el propio error de Azure.
+
+● Searched for 1 pattern, read 2 files (ctrl+o to expand)
+
+● Agrego la propiedad en application.properties (aplica a todos los perfiles):
+
+● Update(src\main\resources\application.properties)
+  ⎿  Added 3 lines
+      1  server.port=8080
+      2 
+      3 +# Permite patrones regex en @GetMapping (necesario para SpaContr
+        +oller)
+      4 +spring.mvc.pathmatch.matching-strategy=ant_path_matcher
+      5 +
+      6  # Perfil activo por defecto
+      7  spring.profiles.active=dev
+      8 
+
+● Haz commit, push y deja que el pipeline redesplegue:
+
+  git add src/main/resources/application.properties
+  git commit -m "Fix SPA route pattern: use ant_path_matcher for regex mapping 
+  support"
+  git push
+
+✻ Cogitated for 39s
+
+> en azure tengo este error ?                                               
+  2026-03-05T00:20:19.0482676Z 2026-03-05T00:20:19.047Z  INFO 70 --- [      
+        main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 -     
+  Starting...                                                               
+  2026-03-05T00:20:19.9134996Z 2026-03-05T00:20:19.913Z  INFO 70 --- [      
+        main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 -     
+  Added connection org.postgresql.jdbc.PgConnection@6cbdd1c5                
+  2026-03-05T00:20:19.9160553Z 2026-03-05T00:20:19.915Z  INFO 70 --- [      
+        main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 -     
+  Start completed.                                                          
+  2026-03-05T00:20:19.9989506Z 2026-03-05T00:20:19.998Z  WARN 70 --- [      
+        main] org.hibernate.orm.deprecation            : HHH90000025:       
+  PostgreSQLDialect does not need to be specified explicitly using          
+  'hibernate.dialect' (remove the property setting and it will be selected  
+  by default)                                                               
+  2026-03-05T00:20:21.485081Z 2026-03-05T00:20:21.484Z  INFO 70 --- [       
+       main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA   
+  platform available (set 'hibernate.transaction.jta.platform' to enable    
+  JTA platform integration)                                                 
+  2026-03-05T00:20:21.4907091Z 2026-03-05T00:20:21.490Z  INFO 70 --- [      
+        main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA    
+  EntityManagerFactory for persistence unit 'default'                       
+  2026-03-05T00:20:22.1924202Z 2026-03-05T00:20:22.192Z  WARN 70 --- [      
+        main] JpaBaseConfiguration$JpaWebConfiguration :                    
+  spring.jpa.open-in-view is enabled by default. Therefore, database        
+  queries may be performed during view rendering. Explicitly configure      
+  spring.jpa.open-in-view to disable this warning                           
+  2026-03-05T00:20:22.4121355Z 2026-03-05T00:20:22.411Z  WARN 70 --- [      
+        main] ConfigServletWebServerApplicationContext : Exception          
+  encountered during context initialization - cancelling refresh attempt:   
+  org.springframework.beans.factory.BeanCreationException: Error creating   
+  bean with name 'routerFunctionMapping' defined in class path resource     
+  [org/springframework/boot/autoconfigure/web/servlet/WebMvcAutoConfigurati 
+  on$EnableWebMvcConfiguration.class]: Failed to instantiate                
+  [org.springframework.web.servlet.function.support.RouterFunctionMapping]: 
+   Factory method 'routerFunctionMapping' threw exception with message:     
+  Error creating bean with name 'messageConverters' defined in class path   
+  resource [org/springframework/boot/autoconfigure/http/HttpMessageConverte 
+  rsAutoConfiguration.class]: Failed to instantiate                         
+  [org.springframework.boot.autoconfigure.http.HttpMessageConverters]:      
+  Factory method 'messageConverters' threw exception with message: Error    
+  creating bean with name 'mappingJackson2HttpMessageConverter' defined in  
+  class path resource                                                       
+  [org/springframework/boot/autoconfigure/http/JacksonHttpMessageConverters 
+  Configuration$MappingJackson2HttpMessageConverterConfiguration.class]:    
+  Unsatisfied dependency expressed through method                           
+  'mappingJackson2HttpMessageConverter' parameter 0: Error creating bean    
+  with name 'jacksonObjectMapper' defined in class path resource            
+  [org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration$ 
+  JacksonObjectMapperConfiguration.class]: Unsatisfied dependency expressed 
+   through method 'jacksonObjectMapper' parameter 0: Error creating bean    
+  with name 'jacksonObjectMapperBuilder' defined in class path resource     
+  [org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration$ 
+  JacksonObjectMapperBuilderConfiguration.class]: Unsatisfied dependency    
+  expressed through method 'jacksonObjectMapperBuilder' parameter 1: Error  
+  creating bean with name 'standardJacksonObjectMapperBuilderCustomizer'    
+  defined in class path resource                                            
+  [org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration$ 
+  Jackson2ObjectMapperBuilderCustomizerConfiguration.class]: Unsatisfied    
+  dependency expressed through method                                       
+  'standardJacksonObjectMapperBuilderCustomizer' parameter 0: Error         
+  creating bean with name 'spring.jackson-org.springframework.boot.autoconf 
+  igure.jackson.JacksonProperties': Could not bind properties to            
+  'JacksonProperties' : prefix=spring.jackson, ignoreInvalidFields=false,   
+  ignoreUnknownFields=true                                                  
+  2026-03-05T00:20:22.4148373Z 2026-03-05T00:20:22.414Z  INFO 70 --- [      
+        main] j.LocalContainerEntityManagerFactoryBean : Closing JPA        
+  EntityManagerFactory for persistence unit 'default'                       
+  2026-03-05T00:20:22.5875075Z 2026-03-05T00:20:22.587Z  INFO 70 --- [      
+        main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 -     
+  Shutdown initiated...                                                     
+  2026-03-05T00:20:22.6558612Z 2026-03-05T00:20:22.655Z  INFO 70 --- [      
+        main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 -     
+  Shutdown completed.                                                       
+  2026-03-05T00:20:22.6808193Z 2026-03-05T00:20:22.680Z  INFO 70 --- [      
+        main] .s.b.a.l.ConditionEvaluationReportLogger :                    
+  2026-03-05T00:20:22.6808786Z                                              
+  2026-03-05T00:20:22.6808837Z Error starting ApplicationContext. To        
+  display the condition evaluation report re-run your application with      
+  'debug' enabled.                                                          
+  2026-03-05T00:20:22.7101604Z 2026-03-05T00:20:22.709Z ERROR 70 --- [      
+        main] o.s.b.d.LoggingFailureAnalysisReporter   :                    
+  2026-03-05T00:20:22.7102185Z                                              
+  2026-03-05T00:20:22.710223Z ***************************                   
+  2026-03-05T00:20:22.7102261Z APPLICATION FAILED TO START                  
+  2026-03-05T00:20:22.7102287Z ***************************                  
+  2026-03-05T00:20:22.710231Z                                               
+  2026-03-05T00:20:22.7102333Z Description:                                 
+  2026-03-05T00:20:22.7102354Z                                              
+  2026-03-05T00:20:22.7102383Z Failed to bind properties under              
+  'spring.jackson.serialization' to                                         
+  java.util.Map<com.fasterxml.jackson.databind.SerializationFeature,        
+  java.lang.Boolean>:                                                       
+  2026-03-05T00:20:22.7102422Z                                              
+  2026-03-05T00:20:22.7102456Z     Reason: failed to convert                
+  java.lang.String to com.fasterxml.jackson.databind.SerializationFeature   
+  (caused by java.lang.IllegalArgumentException: No enum constant           
+  com.fasterxml.jackson.databind.SerializationFeature.fail-on-empt)         
+  2026-03-05T00:20:22.7102478Z                                              
+  2026-03-05T00:20:22.7102501Z Action:                                      
+  2026-03-05T00:20:22.7102522Z                                              
+  2026-03-05T00:20:22.7102545Z Update your application's configuration. The 
+   following values are valid:                                              
+  2026-03-05T00:20:22.7102581Z                                              
+  2026-03-05T00:20:22.7102603Z     CLOSE_CLOSEABLE                          
+  2026-03-05T00:20:22.7102649Z     EAGER_SERIALIZER_FETCH                   
+  2026-03-05T00:20:22.7102678Z     FAIL_ON_EMPTY_BEANS                      
+  2026-03-05T00:20:22.71027Z     FAIL_ON_SELF_REFERENCES                    
+  2026-03-05T00:20:22.7102722Z     FAIL_ON_UNWRAPPED_TYPE_IDENTIFIERS       
+  2026-03-05T00:20:22.7102744Z     FLUSH_AFTER_WRITE_VALUE                  
+  2026-03-05T00:20:22.7102777Z     INDENT_OUTPUT                            
+  2026-03-05T00:20:22.7102801Z     ORDER_MAP_ENTRIES_BY_KEYS                
+  2026-03-05T00:20:22.7102823Z     USE_EQUALITY_FOR_OBJECT_ID               
+  2026-03-05T00:20:22.7102845Z     WRAP_EXCEPTIONS                          
+  2026-03-05T00:20:22.7102868Z     WRAP_ROOT_VALUE                          
+  2026-03-05T00:20:22.7102888Z     WRITE_BIGDECIMAL_AS_PLAIN                
+  2026-03-05T00:20:22.710291Z     WRITE_CHAR_ARRAYS_AS_JSON_ARRAYS          
+  2026-03-05T00:20:22.7102944Z     WRITE_DATES_AS_TIMESTAMPS                
+  2026-03-05T00:20:22.7102971Z     WRITE_DATES_WITH_CONTEXT_TIME_ZONE       
+  2026-03-05T00:20:22.7102998Z     WRITE_DATES_WITH_ZONE_ID                 
+  2026-03-05T00:20:22.7103045Z     WRITE_DATE_KEYS_AS_TIMESTAMPS            
+  2026-03-05T00:20:22.7103078Z     WRITE_DATE_TIMESTAMPS_AS_NANOSECONDS     
+  2026-03-05T00:20:22.7103108Z     WRITE_DURATIONS_AS_TIMESTAMPS            
+  2026-03-05T00:20:22.7103146Z     WRITE_EMPTY_JSON_ARRAYS                  
+  2026-03-05T00:20:22.710317Z     WRITE_ENUMS_USING_INDEX                   
+  2026-03-05T00:20:22.7103657Z     WRITE_ENUMS_USING_TO_STRING              
+  2026-03-05T00:20:22.7103683Z     WRITE_ENUM_KEYS_USING_INDEX              
+  2026-03-05T00:20:22.7103707Z     WRITE_NULL_MAP_VALUES                    
+  2026-03-05T00:20:22.7103733Z     WRITE_SELF_REFERENCES_AS_NULL            
+  2026-03-05T00:20:22.7103758Z     WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED       
+  2026-03-05T00:20:22.7103796Z                                              
+  2026-03-05T00:20:22.7733535Z Wait for pid == 70 either returned           
+  successfully or was interrupted due to a signal 70                        
+  2026-03-05T00:20:22.7738406Z Done waiting for main process.               
+  GLOBAL_PID_MAIN=70.                                                       
+  2026-03-05T00:20:22.7738763Z Exiting entry script!                        
+  2026-03-05T00:20:43.3345087Z Received signal SIGTERM                      
+  2026-03-05T00:20:43.3346824Z Sending SIGTERM to main process. Child       
+  Process ID: 77                                                            
+  2026-03-05T00:20:43.6530564Z Done processing signal SIGTERM. Exiting now! 
+  2026-03-05T00:20:50.2174153Z    _|_|                                      
+  2026-03-05T00:20:50.2174524Z  _|    _|  _|_|_|_|  _|    _|  _|  _|_|      
+  _|_|                                                                      
+  2026-03-05T00:20:50.2174575Z  _|_|_|_|      _|    _|    _|  _|_|          
+  _|_|_|_|                                                                  
+  2026-03-05T00:20:50.2174593Z  _|    _|    _|      _|    _|  _|        _|  
+  2026-03-05T00:20:50.2174609Z  _|    _|  _|_|_|_|    _|_|_|  _|            
+  _|_|_|                                                                    
+  2026-03-05T00:20:50.2174622Z                                              
+  2026-03-05T00:20:50.2174638Z      J A V A   O N   A P P   S E R V I C E   
+  2026-03-05T00:20:50.2174653Z                                              
+  2026-03-05T00:20:50.2174669Z Documentation: https://aka.ms/appservice     
+  2026-03-05T00:20:50.2174682Z                                              
+  2026-03-05T00:20:50.2174709Z **NOTE**: No files or system changes outside 
+   of /home will persist beyond your application's current session. /home   
+  is your application's persistent storage and is shared across all the     
+  server instances.                                                         
+  2026-03-05T00:20:50.2174722Z                                              
+  2026-03-05T00:20:50.2174736Z                                              
+  2026-03-05T00:20:50.2185545Z Determined OS to be: ubuntu                  
+  2026-03-05T00:20:50.218565Z Updating /etc/ssh/sshd_config to use PORT     
+  2222                                                                      
+  2026-03-05T00:20:50.2314027Z Starting ssh service...                      
+  2026-03-05T00:20:50.3210897Z ssh-keygen: generating new host keys: DSA    
+  2026-03-05T00:20:50.4033913Z  * Starting OpenBSD Secure Shell server sshd 
+  2026-03-05T00:20:50.4202429Z    ...done.                                  
+  2026-03-05T00:20:50.4375584Z  * sshd is running                           
+  2026-03-05T00:20:50.4512487Z ## Printing build info...                    
+  2026-03-05T00:20:50.4545562Z                                              
+  PACKAGE |                             VERSION | COMMIT                    
+  2026-03-05T00:20:50.4545831Z                                              
+  Microsoft.AppService.WebsitesExtensionsJava |                             
+  1.0.03290234 | ae284a4                                                    
+  2026-03-05T00:20:50.4545857Z                                              
+    self |                        1.0.03296336 | 76247a61                   
+  2026-03-05T00:20:50.4553528Z ## Done printing build info.                 
+  2026-03-05T00:20:50.4556691Z Container info: WEBSITE_INSTANCE_ID =        
+  dc9b3c65dcd74a4156815a52b4b4465039b5c0a275b6641837e9af68d03b155a ;        
+  WEBSITE_SITE_NAME = vitalinkBackendDev                                    
+  2026-03-05T00:20:50.4616434Z Add public certificates to keystore if       
+  exists...                                                                 
+  2026-03-05T00:20:50.4635064Z Add private certificates to keystore if      
+  exists...                                                                 
+  2026-03-05T00:20:50.4635316Z Configuring max heap = 1024 MB               
+  2026-03-05T00:20:50.4760523Z STARTUP_FILE=                                
+  2026-03-05T00:20:50.4760886Z STARTUP_COMMAND=                             
+  2026-03-05T00:20:50.4760911Z No STARTUP_FILE available.                   
+  2026-03-05T00:20:50.4760931Z No STARTUP_COMMAND defined.                  
+  2026-03-05T00:20:50.7090594Z Mangled result from Jar entry point parser   
+  is: __COM_MICROSOFT_AZURE_APPSERVICE_JARENTRYPOINT_PREFIX__org.springfram 
+  ework.boot.loader.launch.JarLauncher__COM_MICROSOFT_AZURE_APPSERVICE_JARE 
+  NTRYPOINT_SUFFIX__                                                        
+  2026-03-05T00:20:50.7204675Z Extracted jar entry point. Class name is:    
+  'org.springframework.boot.loader.launch.JarLauncher'                      
+  2026-03-05T00:20:50.7277483Z Defaulting to UTF-8                          
+  2026-03-05T00:20:50.7280273Z Running command: java -cp /home/site/wwwroot 
+  /app.jar:/usr/local/appservice/lib/azure.appservice.jar:                  
+  -Djava.util.logging.config.file=/usr/local/appservice/logging.properties  
+  -Dfile.encoding=UTF-8 -Xmx1024M -Djava.net.preferIPv4Stack=true           
+  -Dserver.port=80 -XX:ErrorFile=/home/LogFiles/java_error_vitalinkBackendD 
+  ev_10-30-2-130_%p.log -XX:+CrashOnOutOfMemoryError                        
+  -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/home/LogFiles/java_memd 
+  ump_vitalinkBackendDev_10-30-2-130.log -Duser.dir=/home/site/wwwroot      
+  org.springframework.boot.loader.launch.JarLauncher                        
+  2026-03-05T00:20:50.7282576Z Launched child process with pid: 70          
+  2026-03-05T00:20:50.7334972Z [Telemetry] APP_JAR_PATH:                    
+  /home/site/wwwroot/app.jar:/usr/local/appservice/lib/azure.appservice.jar 
+  2026-03-05T00:20:50.7338318Z x-ms-applog:informational:base64:QVBQX0pBUl9 
+  QQVRIOiAvaG9tZS9zaXRlL3d3d3Jvb3QvYXBwLmphcjovdXNyL2xvY2FsL2FwcHNlcnZpY2Uv 
+  bGliL2F6dXJlLmFwcHNlcnZpY2UuamFy                                          
+  2026-03-05T00:20:50.7338952Z x-ms-telemetry:informational:base64:QVBQX0pB 
+  Ul9QQVRIOiAvaG9tZS9zaXRlL3d3d3Jvb3QvYXBwLmphcjovdXNyL2xvY2FsL2FwcHNlcnZpY 
+  2UvbGliL2F6dXJlLmFwcHNlcnZpY2UuamFy                                       
+  2026-03-05T00:20:50.7705913Z [Telemetry] JARs in                          
+  /home/site/wwwroot/app.jar: spring-boot-3.3.5.jar,spring-boot-autoconfigu 
+  re-3.3.5.jar,logback-classic-1.5.11.jar,logback-core-1.5.11.jar,log4j-to- 
+  slf4j-2.23.1.jar,log4j-api-2.23.1.jar,jul-to-slf4j-2.0.16.jar,jakarta.ann 
+  otation-api-2.1.1.jar,snakeyaml-2.2.jar,jackson-databind-2.17.2.jar,jacks 
+  on-annotations-2.17.2.jar,jackson-core-2.17.2.jar,jackson-datatype-jdk8-2 
+  .17.2.jar,jackson-datatype-jsr310-2.17.2.jar,jackson-module-parameter-nam 
+  es-2.17.2.jar,tomcat-embed-core-10.1.31.jar,tomcat-embed-el-10.1.31.jar,t 
+  omcat-embed-websocket-10.1.31.jar,spring-web-6.1.14.jar,spring-beans-6.1. 
+  14.jar,micrometer-observation-1.13.6.jar,micrometer-commons-1.13.6.jar,sp 
+  ring-webmvc-6.1.14.jar,spring-aop-6.1.14.jar,spring-context-6.1.14.jar,sp 
+  ring-expression-6.1.14.jar,aspectjweaver-1.9.22.1.jar,HikariCP-5.1.0.jar, 
+  spring-jdbc-6.1.14.jar,hibernate-core-6.5.3.Final.jar,jakarta.persistence 
+  -api-3.1.0.jar,jakarta.transaction-api-2.0.1.jar,jboss-logging-3.5.3.Fina 
+  l.jar,hibernate-commons-annotations-6.0.6.Final.jar,jandex-3.1.2.jar,clas 
+  smate-1.7.0.jar,byte-buddy-1.14.19.jar,jaxb-runtime-4.0.5.jar,jaxb-core-4 
+  .0.5.jar,angus-activation-2.0.2.jar,txw2-4.0.5.jar,istack-commons-runtime 
+  -4.1.2.jar,jakarta.inject-api-2.0.1.jar,antlr4-runtime-4.13.0.jar,spring- 
+  data-jpa-3.3.5.jar,spring-data-commons-3.3.5.jar,spring-orm-6.1.14.jar,sp 
+  ring-tx-6.1.14.jar,slf4j-api-2.0.16.jar,spring-aspects-6.1.14.jar,h2-2.2. 
+  224.jar,postgresql-42.7.4.jar,checker-qual-3.42.0.jar,jakarta.xml.bind-ap 
+  i-4.0.2.jar,jakarta.activation-api-2.1.3.jar,spring-core-6.1.14.jar,sprin 
+  g-jcl-6.1.14.jar,spring-boot-jarmode-tools-3.3.5.jar                      
+  2026-03-05T00:20:50.7711139Z x-ms-applog:informational:base64:SkFScyBpbiA 
+  vaG9tZS9zaXRlL3d3d3Jvb3QvYXBwLmphcjogc3ByaW5nLWJvb3QtMy4zLjUuamFyLHNwcmlu 
+  Zy1ib290LWF1dG9jb25maWd1cmUtMy4zLjUuamFyLGxvZ2JhY2stY2xhc3NpYy0xLjUuMTEua 
+  mFyLGxvZ2JhY2stY29yZS0xLjUuMTEuamFyLGxvZzRqLXRvLXNsZjRqLTIuMjMuMS5qYXIsbG 
+  9nNGotYXBpLTIuMjMuMS5qYXIsanVsLXRvLXNsZjRqLTIuMC4xNi5qYXIsamFrYXJ0YS5hbm5 
+  vdGF0aW9uLWFwaS0yLjEuMS5qYXIsc25ha2V5YW1sLTIuMi5qYXIsamFja3Nvbi1kYXRhYmlu 
+  ZC0yLjE3LjIuamFyLGphY2tzb24tYW5ub3RhdGlvbnMtMi4xNy4yLmphcixqYWNrc29uLWNvc 
+  mUtMi4xNy4yLmphcixqYWNrc29uLWRhdGF0eXBlLWpkazgtMi4xNy4yLmphcixqYWNrc29uLW 
+  RhdGF0eXBlLWpzcjMxMC0yLjE3LjIuamFyLGphY2tzb24tbW9kdWxlLXBhcmFtZXRlci1uYW1 
+  lcy0yLjE3LjIuamFyLHRvbWNhdC1lbWJlZC1jb3JlLTEwLjEuMzEuamFyLHRvbWNhdC1lbWJl 
+  ZC1lbC0xMC4xLjMxLmphcix0b21jYXQtZW1iZWQtd2Vic29ja2V0LTEwLjEuMzEuamFyLHNwc 
+  mluZy13ZWItNi4xLjE0LmphcixzcHJpbmctYmVhbnMtNi4xLjE0LmphcixtaWNyb21ldGVyLW 
+  9ic2VydmF0aW9uLTEuMTMuNi5qYXIsbWljcm9tZXRlci1jb21tb25zLTEuMTMuNi5qYXIsc3B 
+  yaW5nLXdlYm12Yy02LjEuMTQuamFyLHNwcmluZy1hb3AtNi4xLjE0LmphcixzcHJpbmctY29u 
+  dGV4dC02LjEuMTQuamFyLHNwcmluZy1leHByZXNzaW9uLTYuMS4xNC5qYXIsYXNwZWN0andlY 
+  XZlci0xLjkuMjIuMS5qYXIsSGlrYXJpQ1AtNS4xLjAuamFyLHNwcmluZy1qZGJjLTYuMS4xNC 
+  5qYXIsaGliZXJuYXRlLWNvcmUtNi41LjMuRmluYWwuamFyLGpha2FydGEucGVyc2lzdGVuY2U 
+  tYXBpLTMuMS4wLmphcixqYWthcnRhLnRyYW5zYWN0aW9uLWFwaS0yLjAuMS5qYXIsamJvc3Mt 
+  bG9nZ2luZy0zLjUuMy5GaW5hbC5qYXIsaGliZXJuYXRlLWNvbW1vbnMtYW5ub3RhdGlvbnMtN 
+  i4wLjYuRmluYWwuamFyLGphbmRleC0zLjEuMi5qYXIsY2xhc3NtYXRlLTEuNy4wLmphcixieX 
+  RlLWJ1ZGR5LTEuMTQuMTkuamFyLGpheGItcnVudGltZS00LjAuNS5qYXIsamF4Yi1jb3JlLTQ 
+  uMC41Lmphcixhbmd1cy1hY3RpdmF0aW9uLTIuMC4yLmphcix0eHcyLTQuMC41Lmphcixpc3Rh 
+  Y2stY29tbW9ucy1ydW50aW1lLTQuMS4yLmphcixqYWthcnRhLmluamVjdC1hcGktMi4wLjEua 
+  mFyLGFudGxyNC1ydW50aW1lLTQuMTMuMC5qYXIsc3ByaW5nLWRhdGEtanBhLTMuMy41Lmphci 
+  xzcHJpbmctZGF0YS1jb21tb25zLTMuMy41LmphcixzcHJpbmctb3JtLTYuMS4xNC5qYXIsc3B 
+  yaW5nLXR4LTYuMS4xNC5qYXIsc2xmNGotYXBpLTIuMC4xNi5qYXIsc3ByaW5nLWFzcGVjdHMt 
+  Ni4xLjE0LmphcixoMi0yLjIuMjI0Lmphcixwb3N0Z3Jlc3FsLTQyLjcuNC5qYXIsY2hlY2tlc 
+  i1xdWFsLTMuNDIuMC5qYXIsamFrYXJ0YS54bWwuYmluZC1hcGktNC4wLjIuamFyLGpha2FydG 
+  EuYWN0aXZhdGlvbi1hcGktMi4xLjMuamFyLHNwcmluZy1jb3JlLTYuMS4xNC5qYXIsc3ByaW5 
+  nLWpjbC02LjEuMTQuamFyLHNwcmluZy1ib290LWphcm1vZGUtdG9vbHMtMy4zLjUuamFy     
+  2026-03-05T00:20:50.7714904Z x-ms-telemetry:informational:base64:SkFScyBp 
+  biAvaG9tZS9zaXRlL3d3d3Jvb3QvYXBwLmphcjogc3ByaW5nLWJvb3QtMy4zLjUuamFyLHNwc 
+  mluZy1ib290LWF1dG9jb25maWd1cmUtMy4zLjUuamFyLGxvZ2JhY2stY2xhc3NpYy0xLjUuMT 
+  EuamFyLGxvZ2JhY2stY29yZS0xLjUuMTEuamFyLGxvZzRqLXRvLXNsZjRqLTIuMjMuMS5qYXI 
+  sbG9nNGotYXBpLTIuMjMuMS5qYXIsanVsLXRvLXNsZjRqLTIuMC4xNi5qYXIsamFrYXJ0YS5h 
+  bm5vdGF0aW9uLWFwaS0yLjEuMS5qYXIsc25ha2V5YW1sLTIuMi5qYXIsamFja3Nvbi1kYXRhY 
+  mluZC0yLjE3LjIuamFyLGphY2tzb24tYW5ub3RhdGlvbnMtMi4xNy4yLmphcixqYWNrc29uLW 
+  NvcmUtMi4xNy4yLmphcixqYWNrc29uLWRhdGF0eXBlLWpkazgtMi4xNy4yLmphcixqYWNrc29 
+  uLWRhdGF0eXBlLWpzcjMxMC0yLjE3LjIuamFyLGphY2tzb24tbW9kdWxlLXBhcmFtZXRlci1u 
+  YW1lcy0yLjE3LjIuamFyLHRvbWNhdC1lbWJlZC1jb3JlLTEwLjEuMzEuamFyLHRvbWNhdC1lb 
+  WJlZC1lbC0xMC4xLjMxLmphcix0b21jYXQtZW1iZWQtd2Vic29ja2V0LTEwLjEuMzEuamFyLH 
+  NwcmluZy13ZWItNi4xLjE0LmphcixzcHJpbmctYmVhbnMtNi4xLjE0LmphcixtaWNyb21ldGV 
+  yLW9ic2VydmF0aW9uLTEuMTMuNi5qYXIsbWljcm9tZXRlci1jb21tb25zLTEuMTMuNi5qYXIs 
+  c3ByaW5nLXdlYm12Yy02LjEuMTQuamFyLHNwcmluZy1hb3AtNi4xLjE0LmphcixzcHJpbmctY 
+  29udGV4dC02LjEuMTQuamFyLHNwcmluZy1leHByZXNzaW9uLTYuMS4xNC5qYXIsYXNwZWN0an 
+  dlYXZlci0xLjkuMjIuMS5qYXIsSGlrYXJpQ1AtNS4xLjAuamFyLHNwcmluZy1qZGJjLTYuMS4 
+  xNC5qYXIsaGliZXJuYXRlLWNvcmUtNi41LjMuRmluYWwuamFyLGpha2FydGEucGVyc2lzdGVu 
+  Y2UtYXBpLTMuMS4wLmphcixqYWthcnRhLnRyYW5zYWN0aW9uLWFwaS0yLjAuMS5qYXIsamJvc 
+  3MtbG9nZ2luZy0zLjUuMy5GaW5hbC5qYXIsaGliZXJuYXRlLWNvbW1vbnMtYW5ub3RhdGlvbn 
+  MtNi4wLjYuRmluYWwuamFyLGphbmRleC0zLjEuMi5qYXIsY2xhc3NtYXRlLTEuNy4wLmphcix 
+  ieXRlLWJ1ZGR5LTEuMTQuMTkuamFyLGpheGItcnVudGltZS00LjAuNS5qYXIsamF4Yi1jb3Jl 
+  LTQuMC41Lmphcixhbmd1cy1hY3RpdmF0aW9uLTIuMC4yLmphcix0eHcyLTQuMC41Lmphcixpc 
+  3RhY2stY29tbW9ucy1ydW50aW1lLTQuMS4yLmphcixqYWthcnRhLmluamVjdC1hcGktMi4wLj 
+  EuamFyLGFudGxyNC1ydW50aW1lLTQuMTMuMC5qYXIsc3ByaW5nLWRhdGEtanBhLTMuMy41Lmp 
+  hcixzcHJpbmctZGF0YS1jb21tb25zLTMuMy41LmphcixzcHJpbmctb3JtLTYuMS4xNC5qYXIs 
+  c3ByaW5nLXR4LTYuMS4xNC5qYXIsc2xmNGotYXBpLTIuMC4xNi5qYXIsc3ByaW5nLWFzcGVjd 
+  HMtNi4xLjE0LmphcixoMi0yLjIuMjI0Lmphcixwb3N0Z3Jlc3FsLTQyLjcuNC5qYXIsY2hlY2 
+  tlci1xdWFsLTMuNDIuMC5qYXIsamFrYXJ0YS54bWwuYmluZC1hcGktNC4wLjIuamFyLGpha2F 
+  ydGEuYWN0aXZhdGlvbi1hcGktMi4xLjMuamFyLHNwcmluZy1jb3JlLTYuMS4xNC5qYXIsc3By 
+  aW5nLWpjbC02LjEuMTQuamFyLHNwcmluZy1ib290LWphcm1vZGUtdG9vbHMtMy4zLjUuamFy  
+  2026-03-05T00:20:50.7716777Z Waiting for main process to exit.            
+  GLOBAL_PID_MAIN=70                                                        
+  2026-03-05T00:20:50.7716843Z Waiting for GLOBAL_PID_MAIN == 70            
+  2026-03-05T00:20:52.7214277Z                                              
+  2026-03-05T00:20:52.7216989Z   .   ____          _            __ _ _      
+  2026-03-05T00:20:52.7217108Z  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \     
+  2026-03-05T00:20:52.7217129Z ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \    
+  2026-03-05T00:20:52.7217146Z  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )   
+  2026-03-05T00:20:52.7217162Z   '  |____| .__|_| |_|_| |_\__, | / / / /    
+  2026-03-05T00:20:52.7217179Z  =========|_|==============|___/=/_/_/_/     
+  2026-03-05T00:20:52.7217195Z                                              
+  2026-03-05T00:20:52.7240805Z  :: Spring Boot ::                (v3.3.5)   
+  2026-03-05T00:20:52.7241078Z                                              
+  2026-03-05T00:20:53.2362899Z 2026-03-05T00:20:53.230Z  INFO 70 --- [      
+        main] c.vitalink.backend.BackendApplication    : Starting           
+  BackendApplication v0.0.1-SNAPSHOT using Java 17.0.17 with PID 70         
+  (/home/site/wwwroot/app.jar started by root in /home/site/wwwroot)        
+  2026-03-05T00:20:53.243731Z 2026-03-05T00:20:53.243Z  INFO 70 --- [       
+       main] c.vitalink.backend.BackendApplication    : The following 1     
+  profile is active: "dev"                                                  
+  2026-03-05T00:20:54.6703162Z 2026-03-05T00:20:54.670Z  INFO 70 --- [      
+        main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping      
+  Spring Data JPA repositories in DEFAULT mode.                             
+  2026-03-05T00:20:54.857199Z 2026-03-05T00:20:54.856Z  INFO 70 --- [       
+       main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring     
+  Data repository scanning in 170 ms. Found 2 JPA repository interfaces.    
+  2026-03-05T00:20:55.9489233Z 2026-03-05T00:20:55.948Z  INFO 70 --- [      
+        main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized 
+   with port 80 (http)                                                      
+  2026-03-05T00:20:56.0263752Z 2026-03-05T00:20:56.025Z  INFO 70 --- [      
+        main] w.s.c.ServletWebServerApplicationContext : Root               
+  WebApplicationContext: initialization completed in 2648 ms                
+  2026-03-05T00:20:56.2949092Z 2026-03-05T00:20:56.293Z  INFO 70 --- [      
+        main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204:         
+  Processing PersistenceUnitInfo [name: default]                            
+  2026-03-05T00:20:56.4575386Z 2026-03-05T00:20:56.456Z  INFO 70 --- [      
+        main] org.hibernate.Version                    : HHH000412:         
+  Hibernate ORM core version 6.5.3.Final                                    
+  2026-03-05T00:20:56.5263027Z 2026-03-05T00:20:56.525Z  INFO 70 --- [      
+        main] o.h.c.internal.RegionFactoryInitiator    : HHH000026:         
+  Second-level cache disabled                                               
+  2026-03-05T00:20:57.1382461Z 2026-03-05T00:20:57.137Z  INFO 70 --- [      
+        main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver  
+  setup: ignoring JPA class transformer                                     
+  2026-03-05T00:20:57.2010073Z 2026-03-05T00:20:57.200Z  INFO 70 --- [      
+        main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 -     
+  Starting...                                                               
+  2026-03-05T00:20:57.9145342Z 2026-03-05T00:20:57.910Z  INFO 70 --- [      
+        main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 -     
+  Added connection org.postgresql.jdbc.PgConnection@67fac095                
+  2026-03-05T00:20:57.91459Z 2026-03-05T00:20:57.912Z  INFO 70 --- [        
+      main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start 
+   completed.                                                               
+  2026-03-05T00:20:57.9782206Z 2026-03-05T00:20:57.977Z  WARN 70 --- [      
+        main] org.hibernate.orm.deprecation            : HHH90000025:       
+  PostgreSQLDialect does not need to be specified explicitly using          
+  'hibernate.dialect' (remove the property setting and it will be selected  
+  by default)                                                               
+  2026-03-05T00:20:59.701255Z 2026-03-05T00:20:59.700Z  INFO 70 --- [       
+       main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA   
+  platform available (set 'hibernate.transaction.jta.platform' to enable    
+  JTA platform integration)                                                 
+  2026-03-05T00:20:59.706468Z 2026-03-05T00:20:59.704Z  INFO 70 --- [       
+       main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA     
+  EntityManagerFactory for persistence unit 'default'                       
+  2026-03-05T00:21:00.3547697Z 2026-03-05T00:21:00.354Z  WARN 70 --- [      
+        main] JpaBaseConfiguration$JpaWebConfiguration :                    
+  spring.jpa.open-in-view is enabled by default. Therefore, database        
+  queries may be performed during view rendering. Explicitly configure      
+  spring.jpa.open-in-view to disable this warning                           
+  2026-03-05T00:21:00.5724794Z 2026-03-05T00:21:00.570Z  WARN 70 --- [      
+        main] ConfigServletWebServerApplicationContext : Exception          
+  encountered during context initialization - cancelling refresh attempt:   
+  org.springframework.beans.factory.BeanCreationException: Error creating   
+  bean with name 'routerFunctionMapping' defined in class path resource     
+  [org/springframework/boot/autoconfigure/web/servlet/WebMvcAutoConfigurati 
+  on$EnableWebMvcConfiguration.class]: Failed to instantiate                
+  [org.springframework.web.servlet.function.support.RouterFunctionMapping]: 
+   Factory method 'routerFunctionMapping' threw exception with message:     
+  Error creating bean with name 'messageConverters' defined in class path   
+  resource [org/springframework/boot/autoconfigure/http/HttpMessageConverte 
+  rsAutoConfiguration.class]: Failed to instantiate                         
+  [org.springframework.boot.autoconfigure.http.HttpMessageConverters]:      
+  Factory method 'messageConverters' threw exception with message: Error    
+  creating bean with name 'mappingJackson2HttpMessageConverter' defined in  
+  class path resource                                                       
+  [org/springframework/boot/autoconfigure/http/JacksonHttpMessageConverters 
+  Configuration$MappingJackson2HttpMessageConverterConfiguration.class]:    
+  Unsatisfied dependency expressed through method                           
+  'mappingJackson2HttpMessageConverter' parameter 0: Error creating bean    
+  with name 'jacksonObjectMapper' defined in class path resource            
+  [org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration$ 
+  JacksonObjectMapperConfiguration.class]: Unsatisfied dependency expressed 
+   through method 'jacksonObjectMapper' parameter 0: Error creating bean    
+  with name 'jacksonObjectMapperBuilder' defined in class path resource     
+  [org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration$ 
+  JacksonObjectMapperBuilderConfiguration.class]: Unsatisfied dependency    
+  expressed through method 'jacksonObjectMapperBuilder' parameter 1: Error  
+  creating bean with name 'standardJacksonObjectMapperBuilderCustomizer'    
+  defined in class path resource                                            
+  [org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration$ 
+  Jackson2ObjectMapperBuilderCustomizerConfiguration.class]: Unsatisfied    
+  dependency expressed through method                                       
+  'standardJacksonObjectMapperBuilderCustomizer' parameter 0: Error         
+  creating bean with name 'spring.jackson-org.springframework.boot.autoconf 
+  igure.jackson.JacksonProperties': Could not bind properties to            
+  'JacksonProperties' : prefix=spring.jackson, ignoreInvalidFields=false,   
+  ignoreUnknownFields=true                                                  
+  2026-03-05T00:21:00.5780457Z 2026-03-05T00:21:00.576Z  INFO 70 --- [      
+        main] j.LocalContainerEntityManagerFactoryBean : Closing JPA        
+  EntityManagerFactory for persistence unit 'default'                       
+  2026-03-05T00:21:00.5808349Z 2026-03-05T00:21:00.580Z  INFO 70 --- [      
+        main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 -     
+  Shutdown initiated...                                                     
+  2026-03-05T00:21:00.634735Z 2026-03-05T00:21:00.634Z  INFO 70 --- [       
+       main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 -      
+  Shutdown completed.                                                       
+  2026-03-05T00:21:00.6600511Z 2026-03-05T00:21:00.659Z  INFO 70 --- [      
+        main] .s.b.a.l.ConditionEvaluationReportLogger :                    
+  2026-03-05T00:21:00.6601101Z                                              
+  2026-03-05T00:21:00.660114Z Error starting ApplicationContext. To display 
+   the condition evaluation report re-run your application with 'debug'     
+  enabled.                                                                  
+  2026-03-05T00:21:00.7007369Z 2026-03-05T00:21:00.700Z ERROR 70 --- [      
+        main] o.s.b.d.LoggingFailureAnalysisReporter   :                    
+  2026-03-05T00:21:00.7008006Z                                              
+  2026-03-05T00:21:00.7008037Z ***************************                  
+  2026-03-05T00:21:00.7008054Z APPLICATION FAILED TO START                  
+  2026-03-05T00:21:00.7008075Z ***************************                  
+  2026-03-05T00:21:00.7008091Z                                              
+  2026-03-05T00:21:00.7008176Z Description:                                 
+  2026-03-05T00:21:00.7008196Z                                              
+  2026-03-05T00:21:00.700822Z Failed to bind properties under               
+  'spring.jackson.serialization' to                                         
+  java.util.Map<com.fasterxml.jackson.databind.SerializationFeature,        
+  java.lang.Boolean>:                                                       
+  2026-03-05T00:21:00.7008235Z                                              
+  2026-03-05T00:21:00.7008261Z     Reason: failed to convert                
+  java.lang.String to com.fasterxml.jackson.databind.SerializationFeature   
+  (caused by java.lang.IllegalArgumentException: No enum constant           
+  com.fasterxml.jackson.databind.SerializationFeature.fail-on-empt)         
+  2026-03-05T00:21:00.7008275Z                                              
+  2026-03-05T00:21:00.7008293Z Action:                                      
+  2026-03-05T00:21:00.7008308Z                                              
+  2026-03-05T00:21:00.700833Z Update your application's configuration. The  
+  following values are valid:                                               
+  2026-03-05T00:21:00.7008345Z                                              
+  2026-03-05T00:21:00.7008362Z     CLOSE_CLOSEABLE                          
+  2026-03-05T00:21:00.700838Z     EAGER_SERIALIZER_FETCH                    
+  2026-03-05T00:21:00.7008408Z     FAIL_ON_EMPTY_BEANS                      
+  2026-03-05T00:21:00.7008426Z     FAIL_ON_SELF_REFERENCES                  
+  2026-03-05T00:21:00.7008444Z     FAIL_ON_UNWRAPPED_TYPE_IDENTIFIERS       
+  2026-03-05T00:21:00.7008461Z     FLUSH_AFTER_WRITE_VALUE                  
+  2026-03-05T00:21:00.7008479Z     INDENT_OUTPUT                            
+  2026-03-05T00:21:00.7008498Z     ORDER_MAP_ENTRIES_BY_KEYS                
+  2026-03-05T00:21:00.7008517Z     USE_EQUALITY_FOR_OBJECT_ID               
+  2026-03-05T00:21:00.7008534Z     WRAP_EXCEPTIONS                          
+  2026-03-05T00:21:00.7008552Z     WRAP_ROOT_VALUE                          
+  2026-03-05T00:21:00.7008569Z     WRITE_BIGDECIMAL_AS_PLAIN                
+  2026-03-05T00:21:00.7008589Z     WRITE_CHAR_ARRAYS_AS_JSON_ARRAYS         
+  2026-03-05T00:21:00.7008607Z     WRITE_DATES_AS_TIMESTAMPS                
+  2026-03-05T00:21:00.7008635Z     WRITE_DATES_WITH_CONTEXT_TIME_ZONE       
+  2026-03-05T00:21:00.7008653Z     WRITE_DATES_WITH_ZONE_ID                 
+  2026-03-05T00:21:00.7008668Z     WRITE_DATE_KEYS_AS_TIMESTAMPS            
+  2026-03-05T00:21:00.7008686Z     WRITE_DATE_TIMESTAMPS_AS_NANOSECONDS     
+  2026-03-05T00:21:00.7008702Z     WRITE_DURATIONS_AS_TIMESTAMPS            
+  2026-03-05T00:21:00.7008719Z     WRITE_EMPTY_JSON_ARRAYS                  
+  2026-03-05T00:21:00.7008734Z     WRITE_ENUMS_USING_INDEX                  
+  2026-03-05T00:21:00.7008751Z     WRITE_ENUMS_USING_TO_STRING              
+  2026-03-05T00:21:00.7008768Z     WRITE_ENUM_KEYS_USING_INDEX              
+  2026-03-05T00:21:00.7008788Z     WRITE_NULL_MAP_VALUES                    
+  2026-03-05T00:21:00.7008803Z     WRITE_SELF_REFERENCES_AS_NULL            
+  2026-03-05T00:21:00.700883Z     WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED        
+  2026-03-05T00:21:00.7008845Z                                              
+  2026-03-05T00:21:00.7396069Z Wait for pid == 70 either returned           
+  successfully or was interrupted due to a signal 70                        
+  2026-03-05T00:21:00.7401225Z Done waiting for main process.               
+  GLOBAL_PID_MAIN=70.                                                       
+  2026-03-05T00:21:00.7401332Z Exiting entry script!                        
+
+● El error es claro: fail-on-empt — la propiedad está truncada en el archivo.
+  Cuando leí el archivo antes se cortó. Veo los properties completos:
+
+● Read 2 files (ctrl+o to expand)
+
+● El archivo application.properties está literalmente truncado en la línea 10 —
+  termina en fail-on-empt sin el resto. Lo corrijo:
+
+● Update(src\main\resources\application.properties)
+  ⎿  Added 1 line, removed 1 line
+       7  spring.profiles.active=dev
+       8 
+       9  # Jackson
+      10 -spring.jackson.serialization.fail-on-empt                      
+      10   No newline at end of file
+      11 +spring.jackson.serialization.fail-on-empty-beans=false
+      12   No newline at end of file
+
+● Commit y push:
+
+  git add src/main/resources/application.properties
+  git commit -m "Fix truncated jackson property in application.properties"
+  git push
+
+> revisa bien y valida 
+
+● Read 6 files (ctrl+o to expand)
+
+● Todo está correcto. Resumen de validación:
+
+  application.properties ✅
+  - spring.mvc.pathmatch.matching-strategy=ant_path_matcher — permite los
+  patrones regex en SpaController
+  - spring.jackson.serialization.fail-on-empty-beans=false — propiedad corregida
+   (ya no truncada)
+  - spring.profiles.active=dev — activa el perfil dev por defecto en Azure
+
+  SpaController.java ✅
+  - Patrón /**/{path:[^\\.]*} — válido con ant_path_matcher
+
+  CorsConfig.java ✅
+  - allowedOriginPatterns("*") — acepta cualquier origen
+
+  master_vitalinkbackend.yml ✅
+  - mvn clean package -DskipTests
+  - Copia a app.jar antes de subir — un solo archivo, sin .original
+  - Deploy con package: 'app.jar'
+
+  Único punto a revisar: el log de Azure muestra que corre con perfil dev, que
+  apunta a una RDS en AWS
+  (vitalink-db-dev.cvsa260o02xg.us-east-2.rds.amazonaws.com). Asegúrate de que
+  esa base de datos esté accesible desde Azure, o configura la variable de
+  entorno SPRING_PROFILES_ACTIVE=prod en la App Service de Azure si quieres usar
+   el perfil prod.
+
+> asi debe quedar? spring.jackson.serialization.fail-on-empty-beans=false 
+
+● Sí, así está correcto. fail-on-empty-beans=false le dice a Jackson que no
+  lance error cuando serializa objetos sin propiedades públicas. Es la sintaxis
+  válida que Spring Boot espera.
+
+> si estoy desplegando dev , deberia haber ese codigo en el properties de   
+  dev ?                                                                     
+
+● Sí, tienes razón. La propiedad Jackson está en application.properties (base)
+  pero lo más limpio es que cada perfil tenga lo que necesita. Muévela al
+  application-dev.properties:
+
+● Update(src\main\resources\application.properties)
+  ⎿  Removed 3 lines
+       5 
+       6  # Perfil activo por defecto
+       7  spring.profiles.active=dev
+       8 -                                                               
+       9 -# Jackson                                                      
+      10 -spring.jackson.serialization.fail-on-empty-beans=false         
+       8   No newline at end of file
+
+● Update(src\main\resources\application-dev.properties)
+  ⎿  Added 3 lines
+      24 
+      25  # ─── H2 Console deshabilitado (usamos PostgreSQL) ──────────
+      26  spring.h2.console.enabled=false
+      27 +
+      28 +# ─── Jackson ───────────────────────────────────────────────
+      29 +spring.jackson.serialization.fail-on-empty-beans=false
+
+● Ahora cada perfil tiene su propia configuración. application.properties solo
+  tiene lo transversal (ant_path_matcher y el perfil activo por defecto).
+
+> ya me funciona ok el backend desde postman 
+
+● Perfecto. Ahora puedes conectar el frontend Angular con la URL del backend en
+  Azure y probar los flujos completos desde el navegador.

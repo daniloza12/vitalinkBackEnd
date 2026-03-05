@@ -2,7 +2,6 @@ package com.vitalink.backend.controller;
 
 import com.vitalink.backend.entity.Profile;
 import com.vitalink.backend.service.ProfileService;
-import com.vitalink.backend.service.RateLimitService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,18 +12,13 @@ import org.springframework.web.bind.annotation.*;
 public class ProfileController {
 
     private final ProfileService profileService;
-    private final RateLimitService rateLimitService;
 
-    public ProfileController(ProfileService profileService, RateLimitService rateLimitService) {
+    public ProfileController(ProfileService profileService) {
         this.profileService = profileService;
-        this.rateLimitService = rateLimitService;
     }
 
     @GetMapping("/{accountId}")
     public ResponseEntity<Profile> getByAccountId(@PathVariable String accountId, HttpServletRequest request) {
-//        if (rateLimitService.isBlocked(request, "/api/v1/profiles/")) {
-//            return ResponseEntity.status(429).build();
-//        }
         return ResponseEntity.ok(profileService.getByAccountId(accountId));
     }
 
