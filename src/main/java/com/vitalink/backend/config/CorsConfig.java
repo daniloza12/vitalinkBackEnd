@@ -10,10 +10,7 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                .allowedOrigins("http://localhost:4200", "http://localhost:4201", "http://localhost:3000",
-                        "https://blue-flower-0c40ce010.2.azurestaticapps.net",
-                        "https://vitalinkdev.jdzurita12.workers.dev",
-                        "https://vitalink-api-proxy.jdzurita12.workers.dev")
+                .allowedOriginPatterns("*")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(false);
