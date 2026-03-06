@@ -60,7 +60,6 @@ public class RateLimitService {
         String ip = (forwarded != null && !forwarded.isEmpty())
                 ? forwarded.split(",")[0].trim()
                 : request.getRemoteAddr();
-        // Strip port if present (e.g. "38.253.148.82:9202" → "38.253.148.82")
         if (ip.contains(".") && ip.contains(":")) {
             ip = ip.substring(0, ip.lastIndexOf(':'));
         }

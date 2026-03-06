@@ -34,9 +34,9 @@ public class AccountController {
     @GetMapping("/security/{securityAccount}")
     public ResponseEntity<Account> getBySecurityAccount(@PathVariable String securityAccount,
                                                         HttpServletRequest request) {
-        if (rateLimitService.isBlocked(request, "/api/v1/accounts/security")) {
-            return ResponseEntity.status(429).build();
-        }
+//        if (rateLimitService.isBlocked(request, "/api/v1/accounts/security")) {
+//            return ResponseEntity.status(429).build();
+//        }
         return ResponseEntity.ok(accountService.getBySecurityAccount(securityAccount));
     }
 

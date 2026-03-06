@@ -21,8 +21,8 @@ public class RateLimitCleanupService {
     }
 
     // Ejecuta cada 60 segundos
-    @Scheduled(fixedDelay = 60000)
-    @Transactional
+//    @Scheduled(fixedDelay = 60000)
+//    @Transactional
     public void cleanupExpiredRecords() {
         LocalDateTime now = LocalDateTime.now();
         int deleted = rateLimitRepository.deleteExpiredBlocks(now);
