@@ -20,13 +20,13 @@ public class RateLimitService {
 
     private final RateLimitRepository rateLimitRepository;
 
-    @Value("${ratelimit.max-hits:10}")
+    @Value("${ratelimit.max-hits}")
     private int maxHits;
 
-    @Value("${ratelimit.time-hit:2}")
+    @Value("${ratelimit.time-hit}")
     private int timeHitMinutes;
 
-    @Value("${ratelimit.block-minutes:4}")
+    @Value("${ratelimit.block-minutes}")
     private int blockMinutes;
 
     public RateLimitService(RateLimitRepository rateLimitRepository) {
@@ -57,9 +57,13 @@ public class RateLimitService {
 
     private String getClientIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isEmpty()) {
-            return forwarded.split(",")[0].trim();
+        String ip = (forwarded != null && !forwarded.isEmpty())
+                ? forwarded.split(",")[0].trim()
+                : request.getRemoteAddr();
+        // Strip port if present (e.g. "38.253.148.82:9202" → "38.253.148.82")
+        if (ip.contains(".") && ip.contains(":")) {
+            ip = ip.substring(0, ip.lastIndexOf(':'));
         }
-        return request.getRemoteAddr();
+        return ip;
     }
 }
