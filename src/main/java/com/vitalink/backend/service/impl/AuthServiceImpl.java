@@ -59,6 +59,7 @@ public class AuthServiceImpl implements AuthService {
         account.setEmail(email);
         account.setPassword(hashedPassword);
         account.setRole("USER");
+        account.setStatus("REGISTRADO");
         account.setSecurityAccount(securityAccount);
         account.setQrDataUrl(null);
         account.setCreatedAt(createdAt);
@@ -89,6 +90,12 @@ public class AuthServiceImpl implements AuthService {
         if (!hashedPassword.equals(account.getPassword())) {
             safeRecord(email, account.getId(), AuditEventType.LOGIN_FAILED, ip, userAgent, "WRONG_PASSWORD");
             throw new BadCredentialsException("Invalid credentials");
+        }
+
+        String status = account.getStatus();
+        if (status == null || (!status.equalsIgnoreCase("REGISTRADO") && !status.equalsIgnoreCase("ACTIVO"))) {
+            safeRecord(email, account.getId(), AuditEventType.LOGIN_FAILED, ip, userAgent, "ACCOUNT_INACTIVE");
+            throw new BadCredentialsException("Account is not active");
         }
 
         safeRecord(email, account.getId(), AuditEventType.LOGIN_SUCCESS, ip, userAgent, null);

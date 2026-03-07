@@ -31,4 +31,7 @@ public class Account {
     private String qrDataUrl;
 
     private String createdAt;
+
+    @Column(nullable = false)
+    private String status;
 }

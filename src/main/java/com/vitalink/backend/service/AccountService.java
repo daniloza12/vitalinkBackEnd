@@ -9,5 +9,6 @@ public interface AccountService {
     Account getById(String id);
     Account getBySecurityAccount(String securityAccount);
     Account update(String id, Account data);
+    Account updateStatus(String id, String status);
     void delete(String id);
 }

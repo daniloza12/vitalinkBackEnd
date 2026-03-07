@@ -1,5 +1,6 @@
 package com.vitalink.backend.controller;
 
+import com.vitalink.backend.dto.StatusUpdateRequest;
 import com.vitalink.backend.entity.Account;
 import com.vitalink.backend.service.AccountService;
 import com.vitalink.backend.service.RateLimitService;
@@ -43,6 +44,12 @@ public class AccountController {
     @PutMapping("/{id}")
     public ResponseEntity<Account> update(@PathVariable String id, @RequestBody Account data) {
         return ResponseEntity.ok(accountService.update(id, data));
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Account> updateStatus(@PathVariable String id,
+                                                @RequestBody StatusUpdateRequest request) {
+        return ResponseEntity.ok(accountService.updateStatus(id, request.getStatus()));
     }
 
     @DeleteMapping("/{id}")

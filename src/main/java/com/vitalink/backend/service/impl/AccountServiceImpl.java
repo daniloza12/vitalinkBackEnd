@@ -47,6 +47,13 @@ public class AccountServiceImpl implements AccountService {
     }
 
     @Override
+    public Account updateStatus(String id, String status) {
+        Account existing = getById(id);
+        existing.setStatus(status);
+        return accountRepository.save(existing);
+    }
+
+    @Override
     public void delete(String id) {
         Account existing = getById(id);
         accountRepository.delete(existing);
