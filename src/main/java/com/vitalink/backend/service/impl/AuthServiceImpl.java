@@ -5,6 +5,7 @@ import com.vitalink.backend.entity.AuditEventType;
 import com.vitalink.backend.exception.BadCredentialsException;
 import com.vitalink.backend.exception.ConflictException;
 import com.vitalink.backend.repository.AccountRepository;
+import com.vitalink.backend.service.ActivationService;
 import com.vitalink.backend.service.AuditService;
 import com.vitalink.backend.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,10 +29,13 @@ public class AuthServiceImpl implements AuthService {
 
     private final AccountRepository accountRepository;
     private final AuditService auditService;
+    private final ActivationService activationService;
 
-    public AuthServiceImpl(AccountRepository accountRepository, AuditService auditService) {
+    public AuthServiceImpl(AccountRepository accountRepository, AuditService auditService,
+                           ActivationService activationService) {
         this.accountRepository = accountRepository;
         this.auditService = auditService;
+        this.activationService = activationService;
     }
 
     private void safeRecord(String email, String accountId, AuditEventType eventType,
@@ -69,6 +73,12 @@ public class AuthServiceImpl implements AuthService {
         HttpServletRequest req = getCurrentRequest();
         safeRecord(email, saved.getId(), AuditEventType.REGISTER,
                 extractIp(req), extractUserAgent(req), null);
+
+        try {
+            activationService.createAndSendToken(saved.getId(), saved.getEmail());
+        } catch (Exception e) {
+            log.warn("Activation email could not be sent for account {}: {}", saved.getId(), e.getMessage());
+        }
 
         return saved;
     }
