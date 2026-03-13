@@ -1,0 +1,16 @@
+services:
+  backend:
+    build: .
+    container_name: vitalink-backend
+    ports:
+      - "127.0.0.1:8080:8080"   # Solo accesible desde localhost (Nginx hace proxy)
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM=${MAIL_FROM}
+      - APP_URL=${APP_URL}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY}
+      - DB_PASSWORD=${DB_PASSWORD}
+    restart: unless-stopped

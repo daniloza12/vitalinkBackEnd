@@ -1,0 +1,10 @@
+target/
+data/
+.git/
+.idea/
+*.md
+*.txt
+*.png
+.env
+.env.*
+!.env.example
