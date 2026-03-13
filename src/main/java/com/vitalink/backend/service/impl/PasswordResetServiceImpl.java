@@ -10,11 +10,10 @@ import com.vitalink.backend.service.EmailService;
 import com.vitalink.backend.service.PasswordResetService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,13 +26,16 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     private final PasswordResetTokenRepository tokenRepository;
     private final AccountRepository accountRepository;
     private final EmailService emailService;
+    private final PasswordEncoder passwordEncoder;
 
     public PasswordResetServiceImpl(PasswordResetTokenRepository tokenRepository,
                                     AccountRepository accountRepository,
-                                    EmailService emailService) {
+                                    EmailService emailService,
+                                    PasswordEncoder passwordEncoder) {
         this.tokenRepository = tokenRepository;
         this.accountRepository = accountRepository;
         this.emailService = emailService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -82,24 +84,12 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         Account account = accountRepository.findById(resetToken.getAccountId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cuenta no encontrada"));
 
-        account.setPassword(sha256(newPassword));
+        account.setPassword(passwordEncoder.encode(newPassword));
         accountRepository.save(account);
 
         resetToken.setUsed(true);
         tokenRepository.save(resetToken);
 
         log.info("Password reset successfully for account {}", account.getId());
-    }
-
-    private String sha256(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder();
-            for (byte b : hash) hex.append(String.format("%02x", b));
-            return hex.toString();
-        } catch (Exception e) {
-            throw new RuntimeException("SHA-256 error", e);
-        }
     }
 }

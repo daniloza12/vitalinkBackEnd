@@ -3,6 +3,7 @@ package com.vitalink.backend.controller;
 import com.vitalink.backend.dto.StatusUpdateRequest;
 import com.vitalink.backend.entity.Account;
 import com.vitalink.backend.service.AccountService;
+import com.vitalink.backend.service.QrAlertService;
 import com.vitalink.backend.service.RateLimitService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
@@ -16,10 +17,14 @@ public class AccountController {
 
     private final AccountService accountService;
     private final RateLimitService rateLimitService;
+    private final QrAlertService qrAlertService;
 
-    public AccountController(AccountService accountService, RateLimitService rateLimitService) {
+    public AccountController(AccountService accountService,
+                             RateLimitService rateLimitService,
+                             QrAlertService qrAlertService) {
         this.accountService = accountService;
         this.rateLimitService = rateLimitService;
+        this.qrAlertService = qrAlertService;
     }
 
     @GetMapping
@@ -38,7 +43,9 @@ public class AccountController {
 //        if (rateLimitService.isBlocked(request, "/api/v1/accounts/security")) {
 //            return ResponseEntity.status(429).build();
 //        }
-        return ResponseEntity.ok(accountService.getBySecurityAccount(securityAccount));
+        Account account = accountService.getBySecurityAccount(securityAccount);
+        qrAlertService.notifyQrScanned(account);
+        return ResponseEntity.ok(account);
     }
 
     @PutMapping("/{id}")

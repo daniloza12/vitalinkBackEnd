@@ -28,6 +28,12 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", "Unauthorized", "message", ex.getMessage()));
     }
 
+    @ExceptionHandler(TurnstileVerificationException.class)
+    public ResponseEntity<Map<String, String>> handleTurnstile(TurnstileVerificationException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "Bad Request", "message", ex.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGeneral(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

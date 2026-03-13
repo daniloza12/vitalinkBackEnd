@@ -1,18 +1,15 @@
 package com.vitalink.backend.config;
 
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.client.RestTemplate;
 
+// CORS is now configured in SecurityConfig via CorsConfigurationSource bean.
 @Configuration
-public class CorsConfig implements WebMvcConfigurer {
+public class CorsConfig {
 
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/**")
-                .allowedOriginPatterns("*")
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
-                .allowedHeaders("*")
-                .allowCredentials(false);
+    @Bean
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
     }
 }

@@ -11,16 +11,17 @@ import com.vitalink.backend.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -30,12 +31,16 @@ public class AuthServiceImpl implements AuthService {
     private final AccountRepository accountRepository;
     private final AuditService auditService;
     private final ActivationService activationService;
+    private final PasswordEncoder passwordEncoder;
 
-    public AuthServiceImpl(AccountRepository accountRepository, AuditService auditService,
-                           ActivationService activationService) {
+    public AuthServiceImpl(AccountRepository accountRepository,
+                           AuditService auditService,
+                           ActivationService activationService,
+                           PasswordEncoder passwordEncoder) {
         this.accountRepository = accountRepository;
         this.auditService = auditService;
         this.activationService = activationService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     private void safeRecord(String email, String accountId, AuditEventType eventType,
@@ -53,13 +58,15 @@ public class AuthServiceImpl implements AuthService {
             throw new ConflictException("Email already registered: " + email);
         }
 
-        String hashedPassword = sha256(password);
-        String securityAccount = sha256(email + System.currentTimeMillis()).substring(0, 32);
-        String id = UUID.randomUUID().toString();
+        String hashedPassword = passwordEncoder.encode(password);
+        byte[] bytes = new byte[16];
+        new SecureRandom().nextBytes(bytes);
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) sb.append(String.format("%02x", b));
+        String securityAccount = sb.toString();
         String createdAt = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
 
         Account account = new Account();
-        account.setId(id);
         account.setEmail(email);
         account.setPassword(hashedPassword);
         account.setRole("USER");
@@ -96,8 +103,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Account account = optAccount.get();
-        String hashedPassword = sha256(password);
-        if (!hashedPassword.equals(account.getPassword())) {
+        if (!passwordEncoder.matches(password, account.getPassword())) {
             safeRecord(email, account.getId(), AuditEventType.LOGIN_FAILED, ip, userAgent, "WRONG_PASSWORD");
             throw new BadCredentialsException("Invalid credentials");
         }
